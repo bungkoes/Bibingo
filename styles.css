@@ -1,0 +1,478 @@
+:root {
+  --bg: #eef5f3;
+  --surface: #ffffff;
+  --surface-strong: #e4f2ea;
+  --ink: #18211f;
+  --muted: #66716f;
+  --line: #c9d7d2;
+  --green: #12765c;
+  --green-dark: #0b5846;
+  --coral: #e45d45;
+  --yellow: #f3b43f;
+  --blue: #276cbd;
+  --cell: #ffffff;
+  --cell-marked: #143c35;
+  --shadow: 0 22px 60px rgba(30, 45, 38, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(39, 108, 189, 0.12), transparent 30%),
+    radial-gradient(circle at 88% 10%, rgba(228, 93, 69, 0.13), transparent 28%),
+    linear-gradient(135deg, #f4f8fb 0%, #e8f3ee 100%);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  width: min(1180px, calc(100vw - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 28px 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.setup-screen,
+.game-screen {
+  width: 100%;
+}
+
+.setup-screen {
+  max-width: 560px;
+}
+
+.brand-row,
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.brand-row {
+  justify-content: flex-start;
+}
+
+.brand-mark {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--green);
+  color: white;
+  font-size: 2rem;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--coral);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 800;
+  line-height: 1.02;
+}
+
+h1 {
+  font-size: 5.4rem;
+}
+
+h2 {
+  font-size: 3.3rem;
+}
+
+.setup-panel,
+.numpad-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.setup-panel {
+  padding: 24px;
+}
+
+.setup-panel label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.size-control {
+  display: grid;
+  grid-template-columns: 54px 1fr 54px;
+  gap: 10px;
+}
+
+.icon-button,
+.primary-button,
+.secondary-button,
+.ghost-button,
+.mode-button,
+.numpad button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
+}
+
+.icon-button:active,
+.primary-button:active,
+.secondary-button:active,
+.ghost-button:active,
+.mode-button:active,
+.numpad button:active,
+.cell-button:active {
+  transform: translateY(1px);
+}
+
+.icon-button {
+  background: var(--surface-strong);
+  color: var(--green-dark);
+  font-size: 1.35rem;
+}
+
+select {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-align: center;
+  text-align-last: center;
+}
+
+#sizeHint {
+  margin: 12px 0 22px;
+  color: var(--muted);
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 58px;
+  background: var(--green);
+  color: white;
+  font-size: 1.05rem;
+}
+
+.primary-button:hover,
+.numpad #applyNumberButton:hover {
+  background: var(--green-dark);
+}
+
+.game-screen {
+  align-self: start;
+}
+
+.ghost-button,
+.secondary-button {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  padding: 0 16px;
+}
+
+.game-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.mode-group {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.mode-button {
+  min-width: 112px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 14px;
+}
+
+.mode-button.active {
+  background: var(--green);
+  color: white;
+}
+
+.bingo-word {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(44px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bingo-letter {
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #a6aaa4;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+
+.bingo-letter.active {
+  background: var(--yellow);
+  border-color: #de9d28;
+  color: var(--ink);
+}
+
+.status-line {
+  min-height: 24px;
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.play-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.board-wrap {
+  width: 100%;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: var(--shadow);
+}
+
+.board-grid {
+  --size: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--size), minmax(48px, 1fr));
+  gap: 6px;
+  min-width: calc(var(--size) * 48px + (var(--size) - 1) * 6px);
+}
+
+.cell-button {
+  position: relative;
+  aspect-ratio: 1;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--cell);
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+  transition:
+    transform 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.cell-button:hover,
+.cell-button.selected {
+  border-color: var(--green);
+}
+
+.cell-button.selected {
+  outline: 3px solid var(--blue);
+  outline-offset: -4px;
+}
+
+.cell-button.marked {
+  background: var(--cell-marked);
+  border-color: var(--cell-marked);
+  color: white;
+}
+
+.cell-button.completed {
+  outline: 3px solid var(--yellow);
+  outline-offset: -5px;
+}
+
+.cell-button.empty {
+  color: #b2b8b2;
+}
+
+.numpad-panel {
+  position: sticky;
+  top: 18px;
+  padding: 14px;
+}
+
+.numpad-panel.disabled {
+  opacity: 0.58;
+}
+
+.numpad-panel.disabled .numpad button {
+  pointer-events: none;
+}
+
+.selected-cell {
+  min-height: 24px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.entry-display {
+  display: grid;
+  place-items: center end;
+  min-height: 56px;
+  margin: 10px 0;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.numpad button {
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-size: 1.08rem;
+}
+
+.numpad #applyNumberButton {
+  background: var(--green);
+  color: white;
+}
+
+.numpad #backspaceButton {
+  background: #f6ded8;
+  color: #9f3828;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100vw - 20px, 680px);
+    padding: 18px 0;
+    place-items: start center;
+  }
+
+  .game-header {
+    align-items: flex-start;
+  }
+
+  .play-area {
+    grid-template-columns: 1fr;
+  }
+
+  h1 {
+    font-size: 4rem;
+  }
+
+  h2 {
+    font-size: 2.6rem;
+  }
+
+  .numpad-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 520px) {
+  .brand-mark {
+    width: 52px;
+    height: 52px;
+  }
+
+  .setup-panel {
+    padding: 18px;
+  }
+
+  h1 {
+    font-size: 3.2rem;
+  }
+
+  h2 {
+    font-size: 2.1rem;
+  }
+
+  .game-header {
+    flex-direction: column;
+  }
+
+  .ghost-button {
+    width: 100%;
+  }
+
+  .game-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mode-group {
+    grid-column: 1 / -1;
+  }
+
+  .mode-button {
+    min-width: 0;
+  }
+
+  .secondary-button {
+    padding: 0 10px;
+  }
+
+  .bingo-letter {
+    font-size: 1.45rem;
+  }
+
+  .cell-button {
+    font-size: 0.92rem;
+  }
+}

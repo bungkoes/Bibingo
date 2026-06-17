@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bibingo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="setup-screen" id="setupScreen" aria-labelledby="appTitle">
+        <div class="brand-row">
+          <div class="brand-mark">B</div>
+          <div>
+            <p class="eyebrow">Board game</p>
+            <h1 id="appTitle">Bibingo</h1>
+          </div>
+        </div>
+
+        <div class="setup-panel">
+          <label for="boardSize">Ukuran board</label>
+          <div class="size-control">
+            <button class="icon-button" id="decreaseSize" type="button" aria-label="Kurangi ukuran">
+              -
+            </button>
+            <select id="boardSize" aria-describedby="sizeHint">
+              <option value="5">5 x 5</option>
+              <option value="6">6 x 6</option>
+              <option value="7">7 x 7</option>
+              <option value="8">8 x 8</option>
+              <option value="9">9 x 9</option>
+              <option value="10">10 x 10</option>
+              <option value="11">11 x 11</option>
+              <option value="12">12 x 12</option>
+            </select>
+            <button class="icon-button" id="increaseSize" type="button" aria-label="Tambah ukuran">
+              +
+            </button>
+          </div>
+          <p id="sizeHint">Pilih dari 5 x 5 sampai 12 x 12.</p>
+          <button class="primary-button" id="startButton" type="button">Start</button>
+        </div>
+      </section>
+
+      <section class="game-screen hidden" id="gameScreen" aria-labelledby="gameTitle">
+        <header class="game-header">
+          <div>
+            <p class="eyebrow">Bibingo</p>
+            <h2 id="gameTitle">Board <span id="currentSize">5 x 5</span></h2>
+          </div>
+          <button class="ghost-button" id="newGameButton" type="button">Game baru</button>
+        </header>
+
+        <section class="game-toolbar" aria-label="Mode pengisian board">
+          <div class="mode-group" role="group" aria-label="Mode">
+            <button class="mode-button active" id="randomModeButton" type="button">Random</button>
+            <button class="mode-button" id="manualModeButton" type="button">Isi sendiri</button>
+          </div>
+          <button class="secondary-button" id="fillRandomButton" type="button">Isi random</button>
+          <button class="secondary-button" id="clearBoardButton" type="button">Kosongkan</button>
+        </section>
+
+        <section class="bingo-word" id="bingoWord" aria-label="Progress bingo"></section>
+
+        <p class="status-line" id="statusLine">Isi board secara random atau pilih kolom untuk isi sendiri.</p>
+
+        <section class="play-area">
+          <div class="board-wrap">
+            <div class="board-grid" id="boardGrid" aria-label="Board bingo"></div>
+          </div>
+
+          <aside class="numpad-panel" id="numpadPanel" aria-label="Numpad">
+            <div class="selected-cell" id="selectedCell">Pilih kolom</div>
+            <div class="entry-display" id="entryDisplay">0</div>
+            <div class="numpad" aria-label="Input angka">
+              <button type="button" data-number="1">1</button>
+              <button type="button" data-number="2">2</button>
+              <button type="button" data-number="3">3</button>
+              <button type="button" data-number="4">4</button>
+              <button type="button" data-number="5">5</button>
+              <button type="button" data-number="6">6</button>
+              <button type="button" data-number="7">7</button>
+              <button type="button" data-number="8">8</button>
+              <button type="button" data-number="9">9</button>
+              <button type="button" id="backspaceButton">Del</button>
+              <button type="button" data-number="0">0</button>
+              <button type="button" id="applyNumberButton">OK</button>
+            </div>
+          </aside>
+        </section>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
