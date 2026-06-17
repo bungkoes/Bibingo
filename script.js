@@ -4,7 +4,6 @@ const BINGO_BASE = ["B", "I", "N", "G", "O"];
 
 const state = {
   size: MIN_SIZE,
-  mode: "random",
   cells: [],
   marked: new Set(),
   selectedIndex: null,
@@ -20,8 +19,6 @@ const increaseSize = document.querySelector("#increaseSize");
 const startButton = document.querySelector("#startButton");
 const newGameButton = document.querySelector("#newGameButton");
 const currentSize = document.querySelector("#currentSize");
-const randomModeButton = document.querySelector("#randomModeButton");
-const manualModeButton = document.querySelector("#manualModeButton");
 const fillRandomButton = document.querySelector("#fillRandomButton");
 const clearBoardButton = document.querySelector("#clearBoardButton");
 const boardGrid = document.querySelector("#boardGrid");
@@ -51,20 +48,11 @@ function startGame() {
   currentSize.textContent = `${state.size} x ${state.size}`;
   setupScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
-  setMode("random");
   renderBingoLetters();
   renderBoard();
   updateBingo();
-  setStatus("Pilih Random untuk isi otomatis, atau Isi sendiri untuk input angka.");
-}
-
-function setMode(mode) {
-  state.mode = mode;
-  randomModeButton.classList.toggle("active", mode === "random");
-  manualModeButton.classList.toggle("active", mode === "manual");
-  fillRandomButton.disabled = mode !== "random";
   updateNumpadState();
-  setStatus(mode === "random" ? "Mode random aktif. Tekan Isi random untuk mengisi board." : "Mode isi sendiri aktif. Pilih kolom lalu input angka.");
+  setStatus("Pilih kolom lalu isi angka, atau tekan Isi random.");
 }
 
 function renderBoard() {
@@ -104,7 +92,7 @@ function renderBingoLetters() {
 }
 
 function handleCellClick(index) {
-  if (state.mode === "manual") {
+  if (!isBoardFull()) {
     state.selectedIndex = index;
     state.entry = state.cells[index] ? String(state.cells[index]) : "";
     updateSelectedCell();
@@ -144,7 +132,7 @@ function fillRandom() {
   renderBoard();
   updateBingo();
   updateNumpadState();
-  setStatus("Board sudah terisi random. Tap angka untuk menandai.");
+  setStatus("Board sudah terisi random. Ketik angka lalu OK, atau tap angka untuk menandai.");
 }
 
 function clearBoard() {
@@ -167,12 +155,7 @@ function shuffle(items) {
 }
 
 function addDigit(digit) {
-  if (!canUseNumpad()) {
-    setStatus("Numpad aktif untuk isi sendiri, atau untuk cari angka setelah board penuh.");
-    return;
-  }
-
-  if (state.mode === "manual" && !isBoardFull() && state.selectedIndex === null) {
+  if (!isBoardFull() && state.selectedIndex === null) {
     setStatus("Pilih kolom dulu sebelum input angka.");
     return;
   }
@@ -183,11 +166,6 @@ function addDigit(digit) {
 }
 
 function applyNumber() {
-  if (!canUseNumpad()) {
-    setStatus("Numpad aktif untuk isi sendiri, atau untuk cari angka setelah board penuh.");
-    return;
-  }
-
   if (isBoardFull()) {
     applySearch();
     return;
@@ -343,12 +321,8 @@ function isBoardFull() {
   return state.cells.length > 0 && state.cells.every(Boolean);
 }
 
-function canUseNumpad() {
-  return state.mode === "manual" || isBoardFull();
-}
-
 function updateNumpadState() {
-  numpadPanel.classList.toggle("disabled", !canUseNumpad());
+  numpadPanel.classList.toggle("disabled", false);
   if (isBoardFull()) {
     selectedCell.textContent = "Cari angka";
   }
@@ -366,8 +340,6 @@ newGameButton.addEventListener("click", () => {
   gameScreen.classList.add("hidden");
   setupScreen.classList.remove("hidden");
 });
-randomModeButton.addEventListener("click", () => setMode("random"));
-manualModeButton.addEventListener("click", () => setMode("manual"));
 fillRandomButton.addEventListener("click", fillRandom);
 clearBoardButton.addEventListener("click", clearBoard);
 numpadButtons.forEach((button) => {
