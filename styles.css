@@ -283,7 +283,7 @@ select {
 
 .board-wrap {
   width: 100%;
-  overflow: auto;
+  overflow: hidden;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -294,15 +294,15 @@ select {
 .board-grid {
   --size: 5;
   display: grid;
-  grid-template-columns: repeat(var(--size), minmax(48px, 1fr));
+  grid-template-columns: repeat(var(--size), minmax(0, 1fr));
   gap: 6px;
-  min-width: calc(var(--size) * 48px + (var(--size) - 1) * 6px);
+  width: 100%;
 }
 
 .cell-button {
   position: relative;
   aspect-ratio: 1;
-  min-height: 48px;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--cell);
@@ -473,6 +473,15 @@ select {
   }
 
   .cell-button {
-    font-size: 0.92rem;
+    border-radius: 5px;
+    font-size: 0.7rem;
+  }
+
+  .board-wrap {
+    padding: 6px;
+  }
+
+  .board-grid {
+    gap: 3px;
   }
 }
