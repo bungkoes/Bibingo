@@ -12,7 +12,6 @@
         <div class="brand-row">
           <div class="brand-mark">B</div>
           <div>
-            <p class="eyebrow">Board game</p>
             <h1 id="appTitle">Bibingo</h1>
           </div>
         </div>
@@ -38,6 +37,30 @@
             </button>
           </div>
           <p id="sizeHint">Pilih dari 5 x 5 sampai 12 x 12.</p>
+
+          <fieldset class="theme-picker">
+            <legend>Tema warna</legend>
+            <div class="color-picker">
+              <div
+                class="color-wheel"
+                id="colorWheel"
+                role="slider"
+                tabindex="0"
+                aria-label="Pilih warna tema"
+                aria-valuemin="0"
+                aria-valuemax="360"
+                aria-valuenow="156"
+              >
+                <span class="color-marker" id="colorMarker" aria-hidden="true"></span>
+              </div>
+              <label class="brightness-control" for="brightnessSlider">
+                <span>Gelap</span>
+                <input id="brightnessSlider" type="range" min="30" max="65" value="45" />
+                <span>Terang</span>
+              </label>
+            </div>
+          </fieldset>
+
           <button class="primary-button" id="startButton" type="button">Start</button>
         </div>
       </section>

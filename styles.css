@@ -12,6 +12,10 @@
   --blue: #276cbd;
   --cell: #ffffff;
   --cell-marked: #143c35;
+  --glow-one: rgba(39, 108, 189, 0.12);
+  --glow-two: rgba(228, 93, 69, 0.13);
+  --page-start: #f4f8fb;
+  --page-end: #e8f3ee;
   --shadow: 0 22px 60px rgba(30, 45, 38, 0.12);
 }
 
@@ -23,9 +27,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 18% 18%, rgba(39, 108, 189, 0.12), transparent 30%),
-    radial-gradient(circle at 88% 10%, rgba(228, 93, 69, 0.13), transparent 28%),
-    linear-gradient(135deg, #f4f8fb 0%, #e8f3ee 100%);
+    radial-gradient(circle at 18% 18%, var(--glow-one), transparent 30%),
+    radial-gradient(circle at 88% 10%, var(--glow-two), transparent 28%),
+    linear-gradient(135deg, var(--page-start) 0%, var(--page-end) 100%);
   color: var(--ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -181,8 +185,112 @@ select {
 }
 
 #sizeHint {
-  margin: 12px 0 22px;
+  margin: 12px 0 20px;
   color: var(--muted);
+}
+
+.theme-picker {
+  min-width: 0;
+  margin: 0 0 22px;
+  padding: 0;
+  border: 0;
+}
+
+.theme-picker legend {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.color-picker {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.color-wheel {
+  position: relative;
+  width: min(230px, 72vw);
+  aspect-ratio: 1;
+  border: 3px solid white;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, white 0%, rgba(255, 255, 255, 0) 72%),
+    conic-gradient(from 90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 14px 32px rgba(30, 45, 38, 0.14);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.color-wheel:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 4px;
+}
+
+.color-marker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 4px solid white;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 3px 8px rgba(0, 0, 0, 0.28);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.setup-panel .brightness-control {
+  width: min(330px, 100%);
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.brightness-control span:first-child {
+  justify-self: start;
+}
+
+.brightness-control span:last-child {
+  justify-self: end;
+  text-align: right;
+}
+
+.brightness-control input {
+  --slider-color: var(--green);
+  width: 100%;
+  height: 12px;
+  margin: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: linear-gradient(90deg, #111, var(--slider-color), white);
+}
+
+.brightness-control input::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  border: 3px solid white;
+  border-radius: 50%;
+  appearance: none;
+  background: var(--slider-color);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.brightness-control input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--slider-color);
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .primary-button {
@@ -282,12 +390,17 @@ select {
   position: relative;
   aspect-ratio: 1;
   min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--cell);
   color: var(--ink);
   font-size: var(--cell-font-size, 1.25rem);
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
   transition:
     transform 120ms ease,
     background 120ms ease,

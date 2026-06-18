@@ -1,9 +1,12 @@
 const MIN_SIZE = 5;
 const MAX_SIZE = 12;
 const BINGO_BASE = ["B", "I", "N", "G", "O"];
+const DEFAULT_THEME = { hue: 156, saturation: 72, lightness: 27 };
 
 const state = {
   size: MIN_SIZE,
+  theme: { ...DEFAULT_THEME },
+  gameStarted: false,
   cells: [],
   marked: new Set(),
   selectedIndex: null,
@@ -34,6 +37,9 @@ const confirmModal = document.querySelector("#confirmModal");
 const confirmMessage = document.querySelector("#confirmMessage");
 const cancelConfirmButton = document.querySelector("#cancelConfirmButton");
 const acceptConfirmButton = document.querySelector("#acceptConfirmButton");
+const colorWheel = document.querySelector("#colorWheel");
+const colorMarker = document.querySelector("#colorMarker");
+const brightnessSlider = document.querySelector("#brightnessSlider");
 let bingoLetters = [];
 let confirmResolver = null;
 
@@ -43,8 +49,81 @@ function setSize(size) {
   state.size = nextSize;
 }
 
+function setTheme(theme, persist = true) {
+  state.theme = {
+    hue: clamp(Number(theme.hue), 0, 360),
+    saturation: clamp(Number(theme.saturation), 0, 100),
+    lightness: clamp(Number(theme.lightness), 30, 65),
+  };
+
+  const { hue, saturation, lightness } = state.theme;
+  const rootStyle = document.documentElement.style;
+  rootStyle.setProperty("--green", `hsl(${hue} ${saturation}% ${lightness}%)`);
+  rootStyle.setProperty("--green-dark", `hsl(${hue} ${Math.min(100, saturation + 4)}% ${Math.max(18, lightness - 12)}%)`);
+  rootStyle.setProperty("--surface-strong", `hsl(${hue} ${Math.max(22, saturation * 0.42)}% 92%)`);
+  rootStyle.setProperty("--line", `hsl(${hue} ${Math.max(14, saturation * 0.24)}% 82%)`);
+  rootStyle.setProperty("--cell-marked", `hsl(${hue} ${Math.max(42, saturation * 0.82)}% ${Math.max(16, lightness - 8)}%)`);
+  rootStyle.setProperty("--blue", `hsl(${(hue + 52) % 360} 62% 45%)`);
+  rootStyle.setProperty("--coral", `hsl(${(hue + 188) % 360} 67% 52%)`);
+  rootStyle.setProperty("--glow-one", `hsl(${hue} ${saturation}% ${lightness}% / 0.16)`);
+  rootStyle.setProperty("--glow-two", `hsl(${(hue + 70) % 360} 70% 55% / 0.12)`);
+  rootStyle.setProperty("--page-start", `hsl(${hue} 32% 97%)`);
+  rootStyle.setProperty("--page-end", `hsl(${hue} 30% 92%)`);
+
+  brightnessSlider.value = String(lightness);
+  brightnessSlider.style.setProperty("--slider-color", `hsl(${hue} ${saturation}% ${lightness}%)`);
+  colorWheel.setAttribute("aria-valuenow", String(Math.round(hue)));
+  updateColorMarker();
+
+  if (!persist) {
+    return;
+  }
+
+  try {
+    localStorage.setItem("bibingo-theme", JSON.stringify(state.theme));
+  } catch {
+    // Theme selection still works when browser storage is unavailable.
+  }
+}
+
+function loadTheme() {
+  try {
+    const savedTheme = JSON.parse(localStorage.getItem("bibingo-theme"));
+    return savedTheme && typeof savedTheme === "object" ? savedTheme : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+function updateThemeFromPointer(event) {
+  const rect = colorWheel.getBoundingClientRect();
+  const radius = rect.width / 2;
+  const x = event.clientX - rect.left - radius;
+  const y = event.clientY - rect.top - radius;
+  const distance = Math.min(radius, Math.hypot(x, y));
+  const hue = (Math.atan2(y, x) * 180) / Math.PI;
+
+  setTheme({
+    hue: hue < 0 ? hue + 360 : hue,
+    saturation: (distance / radius) * 100,
+    lightness: state.theme.lightness,
+  });
+}
+
+function updateColorMarker() {
+  const angle = (state.theme.hue * Math.PI) / 180;
+  const distance = state.theme.saturation * 0.5;
+  colorMarker.style.left = `${50 + Math.cos(angle) * distance}%`;
+  colorMarker.style.top = `${50 + Math.sin(angle) * distance}%`;
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function startGame() {
   setSize(boardSize.value);
+  state.gameStarted = true;
   state.cells = Array.from({ length: state.size * state.size }, () => "");
   state.marked.clear();
   state.selectedIndex = null;
@@ -371,8 +450,30 @@ function getCellFontSize() {
 decreaseSize.addEventListener("click", () => setSize(Number(boardSize.value) - 1));
 increaseSize.addEventListener("click", () => setSize(Number(boardSize.value) + 1));
 boardSize.addEventListener("change", () => setSize(boardSize.value));
+colorWheel.addEventListener("pointerdown", (event) => {
+  colorWheel.setPointerCapture(event.pointerId);
+  updateThemeFromPointer(event);
+});
+colorWheel.addEventListener("pointermove", (event) => {
+  if (colorWheel.hasPointerCapture(event.pointerId)) {
+    updateThemeFromPointer(event);
+  }
+});
+colorWheel.addEventListener("keydown", (event) => {
+  const direction = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+  if (!direction) {
+    return;
+  }
+
+  event.preventDefault();
+  setTheme({ ...state.theme, hue: (state.theme.hue + direction * 3 + 360) % 360 });
+});
+brightnessSlider.addEventListener("input", () => {
+  setTheme({ ...state.theme, lightness: Number(brightnessSlider.value) });
+});
 startButton.addEventListener("click", startGame);
 newGameButton.addEventListener("click", () => {
+  state.gameStarted = false;
   gameScreen.classList.add("hidden");
   setupScreen.classList.remove("hidden");
 });
@@ -398,5 +499,14 @@ document.addEventListener("keydown", (event) => {
     closeConfirm(false);
   }
 });
+window.addEventListener("beforeunload", (event) => {
+  if (!state.gameStarted) {
+    return;
+  }
+
+  event.preventDefault();
+  event.returnValue = "";
+});
 
 setSize(MIN_SIZE);
+setTheme(loadTheme());
