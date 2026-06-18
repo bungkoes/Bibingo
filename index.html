@@ -87,6 +87,18 @@
       </section>
     </main>
 
+    <div class="modal-overlay hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="confirm-card">
+        <div class="confirm-icon">!</div>
+        <h3 id="confirmTitle">Angka sudah dipilih</h3>
+        <p id="confirmMessage">Hapus angka ini dari pilihan?</p>
+        <div class="confirm-actions">
+          <button class="ghost-button" id="cancelConfirmButton" type="button">Batal</button>
+          <button class="danger-button" id="acceptConfirmButton" type="button">Hapus</button>
+        </div>
+      </div>
+    </div>
+
     <script src="script.js"></script>
   </body>
 </html>

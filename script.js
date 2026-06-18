@@ -30,7 +30,12 @@ const bingoWord = document.querySelector("#bingoWord");
 const numpadButtons = Array.from(document.querySelectorAll("[data-number]"));
 const backspaceButton = document.querySelector("#backspaceButton");
 const applyNumberButton = document.querySelector("#applyNumberButton");
+const confirmModal = document.querySelector("#confirmModal");
+const confirmMessage = document.querySelector("#confirmMessage");
+const cancelConfirmButton = document.querySelector("#cancelConfirmButton");
+const acceptConfirmButton = document.querySelector("#acceptConfirmButton");
 let bingoLetters = [];
+let confirmResolver = null;
 
 function setSize(size) {
   const nextSize = Math.min(MAX_SIZE, Math.max(MIN_SIZE, Number(size)));
@@ -56,7 +61,9 @@ function startGame() {
 }
 
 function renderBoard() {
+  const fontSize = getCellFontSize();
   boardGrid.style.setProperty("--size", state.size);
+  boardGrid.style.setProperty("--cell-font-size", `${fontSize}rem`);
   boardGrid.innerHTML = "";
 
   state.cells.forEach((value, index) => {
@@ -77,8 +84,10 @@ function renderBoard() {
 }
 
 function renderBingoLetters() {
+  const fontSize = getCellFontSize();
   bingoWord.innerHTML = "";
   bingoWord.style.setProperty("--bingo-count", state.size);
+  bingoWord.style.setProperty("--cell-font-size", `${fontSize}rem`);
 
   getBingoTarget().forEach((letter) => {
     const span = document.createElement("span");
@@ -91,7 +100,7 @@ function renderBingoLetters() {
   bingoLetters = Array.from(bingoWord.querySelectorAll(".bingo-letter"));
 }
 
-function handleCellClick(index) {
+async function handleCellClick(index) {
   if (!isBoardFull()) {
     state.selectedIndex = index;
     state.entry = state.cells[index] ? String(state.cells[index]) : "";
@@ -106,7 +115,8 @@ function handleCellClick(index) {
   }
 
   if (state.marked.has(index)) {
-    if (!confirm(`${state.cells[index]} sudah dipilih, hapus?`)) {
+    const shouldRemove = await showConfirm(`${state.cells[index]} sudah dipilih, hapus?`);
+    if (!shouldRemove) {
       return;
     }
 
@@ -193,7 +203,7 @@ function applyNumber() {
   setStatus(nextIndex === null ? "Semua kolom sudah terisi. Tap angka untuk menandai." : "Angka tersimpan. Lanjut isi kolom berikutnya.");
 }
 
-function applySearch() {
+async function applySearch() {
   if (!state.entry) {
     setStatus("Masukkan angka yang mau dicari.");
     return;
@@ -214,7 +224,8 @@ function applySearch() {
 
   if (state.marked.has(foundIndex)) {
     renderBoard();
-    if (confirm(`${number} sudah dipilih, hapus?`)) {
+    const shouldRemove = await showConfirm(`${number} sudah dipilih, hapus?`);
+    if (shouldRemove) {
       state.marked.delete(foundIndex);
       state.completedLines = findCompletedLines();
       renderBoard();
@@ -317,6 +328,24 @@ function setStatus(message) {
   statusLine.textContent = message;
 }
 
+function showConfirm(message) {
+  confirmMessage.textContent = message;
+  confirmModal.classList.remove("hidden");
+  acceptConfirmButton.focus();
+
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function closeConfirm(result) {
+  confirmModal.classList.add("hidden");
+  if (confirmResolver) {
+    confirmResolver(result);
+    confirmResolver = null;
+  }
+}
+
 function isBoardFull() {
   return state.cells.length > 0 && state.cells.every(Boolean);
 }
@@ -330,6 +359,13 @@ function updateNumpadState() {
 
 function getBingoTarget() {
   return Array.from({ length: state.size }, (_, index) => BINGO_BASE[index % BINGO_BASE.length]);
+}
+
+function getCellFontSize() {
+  const largest = 1.55;
+  const smallest = 0.82;
+  const progress = (state.size - MIN_SIZE) / (MAX_SIZE - MIN_SIZE);
+  return largest - (largest - smallest) * progress;
 }
 
 decreaseSize.addEventListener("click", () => setSize(Number(boardSize.value) - 1));
@@ -350,5 +386,17 @@ backspaceButton.addEventListener("click", () => {
   updateSelectedCell();
 });
 applyNumberButton.addEventListener("click", applyNumber);
+cancelConfirmButton.addEventListener("click", () => closeConfirm(false));
+acceptConfirmButton.addEventListener("click", () => closeConfirm(true));
+confirmModal.addEventListener("click", (event) => {
+  if (event.target === confirmModal) {
+    closeConfirm(false);
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !confirmModal.classList.contains("hidden")) {
+    closeConfirm(false);
+  }
+});
 
 setSize(MIN_SIZE);

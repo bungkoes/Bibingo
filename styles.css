@@ -220,20 +220,23 @@ select {
 
 .bingo-word {
   display: grid;
-  grid-template-columns: repeat(5, minmax(44px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(var(--bingo-count, 5), minmax(0, 1fr));
+  gap: 6px;
+  width: calc(100% - 296px);
+  padding: 0 10px;
   margin-bottom: 12px;
 }
 
 .bingo-letter {
-  min-height: 54px;
+  min-width: 0;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.7);
   color: #a6aaa4;
-  font-size: 2.2rem;
+  font-size: var(--cell-font-size, 1.25rem);
   font-weight: 800;
 }
 
@@ -283,7 +286,7 @@ select {
   border-radius: 8px;
   background: var(--cell);
   color: var(--ink);
-  font-size: 1.25rem;
+  font-size: var(--cell-font-size, 1.25rem);
   font-weight: 800;
   transition:
     transform 120ms ease,
@@ -373,6 +376,70 @@ select {
   color: #9f3828;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 28, 24, 0.56);
+  backdrop-filter: blur(4px);
+}
+
+.confirm-card {
+  width: min(100%, 380px);
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px rgba(15, 28, 24, 0.28);
+  text-align: center;
+}
+
+.confirm-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #f6ded8;
+  color: #a43b2b;
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.confirm-card h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.confirm-card p {
+  margin: 8px 0 20px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.danger-button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--coral);
+  color: white;
+  font-weight: 800;
+}
+
+.danger-button:hover {
+  background: #bd4633;
+}
+
 @media (max-width: 860px) {
   .app-shell {
     width: min(100vw - 20px, 680px);
@@ -388,6 +455,10 @@ select {
 
   .play-area {
     grid-template-columns: 1fr;
+  }
+
+  .bingo-word {
+    width: 100%;
   }
 
   h1 {
@@ -448,14 +519,14 @@ select {
   }
 
   .bingo-word {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 6px;
+    gap: 3px;
+    padding: 0 6px;
     margin-bottom: 10px;
   }
 
   .bingo-letter {
-    min-height: 42px;
-    font-size: 1.2rem;
+    border-radius: 5px;
+    font-size: var(--cell-font-size, 1rem);
   }
 
   .status-line {
@@ -466,7 +537,7 @@ select {
 
   .cell-button {
     border-radius: 5px;
-    font-size: 0.88rem;
+    font-size: var(--cell-font-size, 1rem);
   }
 
   .board-wrap {
