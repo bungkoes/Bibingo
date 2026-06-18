@@ -283,7 +283,7 @@ select {
   border-radius: 8px;
   background: var(--cell);
   color: var(--ink);
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   font-weight: 800;
   transition:
     transform 120ms ease,
@@ -466,7 +466,7 @@ select {
 
   .cell-button {
     border-radius: 5px;
-    font-size: 0.7rem;
+    font-size: 0.88rem;
   }
 
   .board-wrap {
