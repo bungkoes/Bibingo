@@ -218,12 +218,30 @@ function createRoom() {
   };
   setMode("online");
 
-  const peer = new Peer(`${ROOM_PREFIX}${code}`);
+  const peer = new Peer(`${ROOM_PREFIX}${code}`, {
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" }
+      ]
+    }
+  });
   state.online.peer = peer;
   setLobbyStatus("Membuat room...");
   startButton.disabled = true;
 
+  let createTimeout = setTimeout(() => {
+    if (!peer.open) {
+      setLobbyStatus("Gagal membuat room. Koneksi lambat/terblokir. Coba VPN atau ganti internet.");
+      resetOnlineRoom();
+    }
+  }, 12000);
+
   peer.on("open", () => {
+    clearTimeout(createTimeout);
     roomCodeDisplay.textContent = `Kode room: ${code}`;
     roomCodeDisplay.classList.remove("hidden");
     startButton.disabled = false;
@@ -239,8 +257,10 @@ function createRoom() {
     connection.on("error", () => removePlayerConnection(connection.peer));
   });
 
-  peer.on("error", () => {
-    setLobbyStatus("Room gagal dibuat. Coba kode baru.");
+  peer.on("error", (err) => {
+    clearTimeout(createTimeout);
+    console.error("Peer error:", err);
+    setLobbyStatus("Room gagal dibuat. Coba kode baru atau cek koneksi.");
     startButton.disabled = true;
   });
 }
@@ -259,16 +279,35 @@ function joinRoom() {
   resetOnlineRoom();
   state.online.role = "client";
   setMode("online");
-  const peer = new Peer();
+
+  const peer = new Peer({
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" }
+      ]
+    }
+  });
   state.online.peer = peer;
   startButton.disabled = true;
   setLobbyStatus("Menghubungkan ke room...");
+
+  let connectionTimeout = setTimeout(() => {
+    if (state.online.hostConnection && !state.online.hostConnection.open) {
+      setLobbyStatus("Gagal terhubung (Timeout). Gunakan VPN, ganti koneksi (misal ke tethering/Wifi sama), atau pastikan host aktif.");
+      resetOnlineRoom();
+    }
+  }, 12000);
 
   peer.on("open", () => {
     const connection = peer.connect(`${ROOM_PREFIX}${code}`, { reliable: true });
     state.online.hostConnection = connection;
 
     connection.on("open", () => {
+      clearTimeout(connectionTimeout);
       connection.send({ type: "join", player: getSelfPlayer(false) });
       roomCodeDisplay.textContent = `Kode room: ${code}`;
       roomCodeDisplay.classList.remove("hidden");
@@ -277,13 +316,21 @@ function joinRoom() {
 
     connection.on("data", handleClientMessage);
     connection.on("close", () => {
+      clearTimeout(connectionTimeout);
       setLobbyStatus("Koneksi room terputus.");
       setStatus("Koneksi room terputus.");
     });
-    connection.on("error", () => setLobbyStatus("Gagal join room. Cek kode room."));
+    connection.on("error", () => {
+      clearTimeout(connectionTimeout);
+      setLobbyStatus("Gagal join room. Cek kode room.");
+    });
   });
 
-  peer.on("error", () => setLobbyStatus("Gagal membuka koneksi online."));
+  peer.on("error", (err) => {
+    clearTimeout(connectionTimeout);
+    console.error("Peer error:", err);
+    setLobbyStatus("Gagal membuka koneksi online: " + (err.type || "unknown"));
+  });
 }
 
 function handleHostMessage(connection, message) {
