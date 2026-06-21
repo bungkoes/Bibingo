@@ -4,6 +4,10 @@ const BINGO_BASE = ["B", "I", "N", "G", "O"];
 const DEFAULT_THEME = { hue: 156, saturation: 72, lightness: 27 };
 const ROOM_PREFIX = "bibingo-room-";
 
+// Masukkan URL dan Anon Key Supabase Anda di sini agar pemain tidak perlu menginputnya lagi di browser
+const DEFAULT_SUPABASE_URL = "";
+const DEFAULT_SUPABASE_KEY = "";
+
 const state = {
   size: MIN_SIZE,
   theme: { ...DEFAULT_THEME },
@@ -205,8 +209,8 @@ saveSupabaseButton.addEventListener("click", () => {
 });
 
 function initSupabase() {
-  const url = localStorage.getItem("bibingo-supabase-url");
-  const key = localStorage.getItem("bibingo-supabase-key");
+  const url = localStorage.getItem("bibingo-supabase-url") || DEFAULT_SUPABASE_URL;
+  const key = localStorage.getItem("bibingo-supabase-key") || DEFAULT_SUPABASE_KEY;
   if (url && key) {
     try {
       supabase = window.supabase.createClient(url, key);
