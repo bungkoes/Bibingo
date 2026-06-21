@@ -165,21 +165,194 @@ function ensureSelfInRoom(ready = false) {
   }
 }
 
-function resetOnlineRoom() {
-  if (state.online.hostConnection) {
-    state.online.hostConnection.close();
+let supabase = null;
+let activeChannel = null;
+let heartbeatInterval = null;
+
+const supabaseModal = document.querySelector("#supabaseModal");
+const setupSupabaseButton = document.querySelector("#setupSupabaseButton");
+const cancelSupabaseButton = document.querySelector("#cancelSupabaseButton");
+const saveSupabaseButton = document.querySelector("#saveSupabaseButton");
+const supabaseUrlInput = document.querySelector("#supabaseUrlInput");
+const supabaseKeyInput = document.querySelector("#supabaseKeyInput");
+
+setupSupabaseButton.addEventListener("click", () => {
+  supabaseUrlInput.value = localStorage.getItem("bibingo-supabase-url") || "";
+  supabaseKeyInput.value = localStorage.getItem("bibingo-supabase-key") || "";
+  supabaseModal.classList.remove("hidden");
+});
+
+cancelSupabaseButton.addEventListener("click", () => {
+  supabaseModal.classList.add("hidden");
+});
+
+saveSupabaseButton.addEventListener("click", () => {
+  const url = supabaseUrlInput.value.trim();
+  const key = supabaseKeyInput.value.trim();
+  if (!url || !key) {
+    alert("URL dan Anon Key harus diisi!");
+    return;
+  }
+  localStorage.setItem("bibingo-supabase-url", url);
+  localStorage.setItem("bibingo-supabase-key", key);
+  supabaseModal.classList.add("hidden");
+  
+  if (initSupabase()) {
+    setLobbyStatus("Supabase berhasil dikonfigurasi.");
+  } else {
+    setLobbyStatus("Gagal menginisialisasi Supabase.");
+  }
+});
+
+function initSupabase() {
+  const url = localStorage.getItem("bibingo-supabase-url");
+  const key = localStorage.getItem("bibingo-supabase-key");
+  if (url && key) {
+    try {
+      supabase = window.supabase.createClient(url, key);
+      return true;
+    } catch (e) {
+      console.error("Gagal inisialisasi Supabase client:", e);
+    }
+  }
+  return false;
+}
+
+function checkSupabaseConfigured() {
+  if (!supabase) {
+    if (!initSupabase()) {
+      supabaseModal.classList.remove("hidden");
+      setLobbyStatus("Konfigurasi Supabase terlebih dahulu!");
+      return false;
+    }
+  }
+  return true;
+}
+
+function convertDbRoomToStateRoom(dbRoom, dbPlayers) {
+  return {
+    code: dbRoom.code,
+    hostId: dbRoom.host_id,
+    size: dbRoom.size,
+    phase: dbRoom.phase,
+    turnIndex: dbRoom.turn_index,
+    calledNumbers: dbRoom.called_numbers || [],
+    lastCall: dbRoom.last_call,
+    winner: dbRoom.winner,
+    lastWinnerId: dbRoom.last_winner_id,
+    players: dbPlayers.map(p => ({
+      id: p.id,
+      name: p.name,
+      ready: p.ready,
+      connected: true
+    }))
+  };
+}
+
+async function fetchAndSyncRoom(roomCode) {
+  if (!supabase) return;
+  try {
+    const { data: rooms, error: roomError } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("code", roomCode);
+
+    if (roomError) throw roomError;
+    if (!rooms || rooms.length === 0) return;
+
+    const dbRoom = rooms[0];
+
+    const { data: dbPlayers, error: playersError } = await supabase
+      .from("players")
+      .select("*")
+      .eq("room_code", roomCode)
+      .order("last_active_at", { ascending: true });
+
+    if (playersError) throw playersError;
+
+    const syncedRoom = convertDbRoomToStateRoom(dbRoom, dbPlayers);
+    applyRoomState(syncedRoom);
+  } catch (err) {
+    console.error("Error fetching room/players:", err);
+  }
+}
+
+function subscribeToRoom(roomCode) {
+  if (!supabase) return;
+  if (activeChannel) {
+    activeChannel.unsubscribe();
   }
 
-  state.online.connections.forEach((connection) => connection.close());
+  activeChannel = supabase.channel(`room-channel-${roomCode}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "rooms", filter: `code=eq.${roomCode}` },
+      () => {
+        fetchAndSyncRoom(roomCode);
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "players", filter: `room_code=eq.${roomCode}` },
+      () => {
+        fetchAndSyncRoom(roomCode);
+      }
+    )
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        console.log("Subscribed to realtime updates for room:", roomCode);
+        startPlayerHeartbeat(roomCode);
+      }
+    });
+}
 
-  if (state.online.peer) {
-    state.online.peer.destroy();
+function startPlayerHeartbeat(roomCode) {
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
+  heartbeatInterval = setInterval(async () => {
+    if (state.mode !== "online" || !supabase) {
+      clearInterval(heartbeatInterval);
+      return;
+    }
+    try {
+      await supabase
+        .from("players")
+        .update({ last_active_at: new Date().toISOString() })
+        .eq("id", state.playerId)
+        .eq("room_code", roomCode);
+    } catch (err) {
+      console.warn("Heartbeat update failed:", err);
+    }
+  }, 15000);
+}
+
+async function deleteSelfFromRoom() {
+  if (state.mode === "online" && supabase && state.online.room) {
+    try {
+      await supabase
+        .from("players")
+        .delete()
+        .eq("id", state.playerId)
+        .eq("room_code", state.online.room.code);
+    } catch (err) {
+      console.warn("Failed to delete self from room:", err);
+    }
   }
+}
+
+async function resetOnlineRoom() {
+  if (activeChannel) {
+    activeChannel.unsubscribe();
+    activeChannel = null;
+  }
+
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+
+  await deleteSelfFromRoom();
 
   state.online.role = null;
-  state.online.peer = null;
-  state.online.hostConnection = null;
-  state.online.connections = new Map();
   state.online.room = null;
   state.online.ready = false;
   roomCodeDisplay.classList.add("hidden");
@@ -189,98 +362,70 @@ function resetOnlineRoom() {
 }
 
 function ensurePeerAvailable() {
-  if (typeof Peer === "undefined") {
-    setLobbyStatus("Koneksi online belum siap. Cek internet lalu refresh halaman.");
-    return false;
-  }
-
-  return true;
+  return checkSupabaseConfigured();
 }
 
-function createRoom() {
+async function createRoom() {
   if (!ensurePeerAvailable()) {
     return;
   }
 
-  resetOnlineRoom();
+  await resetOnlineRoom();
   const code = generateRoomCode();
   state.online.role = "host";
-  state.online.room = {
+
+  const roomData = {
     code,
-    hostId: state.playerId,
+    host_id: state.playerId,
     size: Number(boardSize.value),
     phase: "lobby",
-    turnIndex: 0,
-    calledNumbers: [],
-    lastCall: null,
+    turn_index: 0,
+    called_numbers: [],
+    last_call: null,
     winner: null,
-    players: [getSelfPlayer(false)],
+    last_winner_id: null
   };
-  setMode("online");
 
-  const peer = new Peer(`${ROOM_PREFIX}${code}`, {
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        {
-          urls: "turn:openrelay.metered.ca:80",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        }
-      ]
-    }
-  });
-  state.online.peer = peer;
   setLobbyStatus("Membuat room...");
   startButton.disabled = true;
 
-  let createTimeout = setTimeout(() => {
-    if (!peer.open) {
-      setLobbyStatus("Gagal membuat room. Koneksi lambat/terblokir. Coba VPN atau ganti internet.");
-      resetOnlineRoom();
-    }
-  }, 12000);
+  try {
+    const { error: roomError } = await supabase
+      .from("rooms")
+      .insert(roomData);
 
-  peer.on("open", () => {
-    clearTimeout(createTimeout);
+    if (roomError) throw roomError;
+
+    const player = getSelfPlayer(false);
+    const { error: playerError } = await supabase
+      .from("players")
+      .insert({
+        id: player.id,
+        room_code: code,
+        name: player.name,
+        ready: player.ready
+      });
+
+    if (playerError) throw playerError;
+
+    state.online.room = convertDbRoomToStateRoom(roomData, [player]);
+    setMode("online");
     roomCodeDisplay.textContent = `Kode room: ${code}`;
     roomCodeDisplay.classList.remove("hidden");
     startButton.disabled = false;
     setLobbyStatus("Bagikan kode room ke temanmu.");
-    renderOnlinePlayers();
+
+    subscribeToRoom(code);
+    await fetchAndSyncRoom(code);
     showSetup();
-  });
-
-  peer.on("connection", (connection) => {
-    state.online.connections.set(connection.peer, connection);
-    connection.on("data", (message) => handleHostMessage(connection, message));
-    connection.on("close", () => removePlayerConnection(connection.peer));
-    connection.on("error", () => removePlayerConnection(connection.peer));
-  });
-
-  peer.on("error", (err) => {
-    clearTimeout(createTimeout);
-    console.error("Peer error:", err);
-    setLobbyStatus("Room gagal dibuat. Coba kode baru atau cek koneksi.");
+  } catch (err) {
+    console.error("Error creating room:", err);
+    setLobbyStatus("Room gagal dibuat: " + err.message);
     startButton.disabled = true;
-  });
+  }
 }
 
-function joinRoom() {
+async function joinRoom() {
   if (!ensurePeerAvailable()) {
     return;
   }
@@ -291,115 +436,47 @@ function joinRoom() {
     return;
   }
 
-  resetOnlineRoom();
+  await resetOnlineRoom();
   state.online.role = "client";
   setMode("online");
-
-  const peer = new Peer({
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
-        {
-          urls: "turn:openrelay.metered.ca:80",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        }
-      ]
-    }
-  });
-  state.online.peer = peer;
   startButton.disabled = true;
   setLobbyStatus("Menghubungkan ke room...");
 
-  let connectionTimeout = setTimeout(() => {
-    if (state.online.hostConnection && !state.online.hostConnection.open) {
-      setLobbyStatus("Gagal terhubung (Timeout). Gunakan VPN, ganti koneksi (misal ke tethering/Wifi sama), atau pastikan host aktif.");
-      resetOnlineRoom();
+  try {
+    const { data: rooms, error: roomError } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("code", code);
+
+    if (roomError) throw roomError;
+    if (!rooms || rooms.length === 0) {
+      setLobbyStatus("Room tidak ditemukan. Periksa kode room.");
+      startButton.disabled = false;
+      return;
     }
-  }, 12000);
 
-  peer.on("open", () => {
-    const connection = peer.connect(`${ROOM_PREFIX}${code}`, { reliable: true });
-    state.online.hostConnection = connection;
+    const player = getSelfPlayer(false);
+    const { error: playerError } = await supabase
+      .from("players")
+      .upsert({
+        id: player.id,
+        room_code: code,
+        name: player.name,
+        ready: player.ready,
+        last_active_at: new Date().toISOString()
+      });
 
-    connection.on("open", () => {
-      clearTimeout(connectionTimeout);
-      connection.send({ type: "join", player: getSelfPlayer(false) });
-      roomCodeDisplay.textContent = `Kode room: ${code}`;
-      roomCodeDisplay.classList.remove("hidden");
-      setLobbyStatus("Terhubung. Tunggu host mulai game.");
-    });
+    if (playerError) throw playerError;
 
-    connection.on("data", handleClientMessage);
-    connection.on("close", () => {
-      clearTimeout(connectionTimeout);
-      setLobbyStatus("Koneksi room terputus.");
-      setStatus("Koneksi room terputus.");
-    });
-    connection.on("error", () => {
-      clearTimeout(connectionTimeout);
-      setLobbyStatus("Gagal join room. Cek kode room.");
-    });
-  });
+    roomCodeDisplay.textContent = `Kode room: ${code}`;
+    roomCodeDisplay.classList.remove("hidden");
+    setLobbyStatus("Terhubung. Tunggu host mulai game.");
 
-  peer.on("error", (err) => {
-    clearTimeout(connectionTimeout);
-    console.error("Peer error:", err);
-    setLobbyStatus("Gagal membuka koneksi online: " + (err.type || "unknown"));
-  });
-}
-
-function handleHostMessage(connection, message) {
-  if (!message || !message.type || !state.online.room) {
-    return;
-  }
-
-  if (message.type === "join") {
-    upsertPlayer({ ...message.player, ready: false, connected: true });
-    connection.send({ type: "room-state", room: state.online.room });
-    broadcastRoomState();
-    setLobbyStatus(`${message.player.name} masuk room.`);
-    return;
-  }
-
-  if (message.type === "ready") {
-    setPlayerReady(message.playerId, true);
-    maybeStartTurns();
-    broadcastRoomState();
-    return;
-  }
-
-  if (message.type === "call-number") {
-    handleOnlineCall(message.number, message.playerId);
-    return;
-  }
-
-  if (message.type === "winner") {
-    handleOnlineWinner(message.player);
-  }
-}
-
-function handleClientMessage(message) {
-  if (!message || !message.type) {
-    return;
-  }
-
-  if (message.type === "room-state") {
-    applyRoomState(message.room);
+    subscribeToRoom(code);
+    await fetchAndSyncRoom(code);
+  } catch (err) {
+    console.error("Error joining room:", err);
+    setLobbyStatus("Gagal join room: " + err.message);
   }
 }
 
@@ -436,26 +513,13 @@ function broadcastRoomState() {
   }
 
   applyRoomState(room);
-
-  state.online.connections.forEach((connection) => {
-    try {
-      if (connection.open) {
-        connection.send({ type: "room-state", room });
-      }
-    } catch {
-      state.online.connections.delete(connection.peer);
-    }
-  });
 }
 
 function sendToHost(message) {
-  const connection = state.online.hostConnection;
-  if (connection?.open) {
-    connection.send(message);
-  }
+  // Logic replaced by Supabase
 }
 
-function submitOnlineCall(number) {
+async function submitOnlineCall(number) {
   const room = state.online.room;
   if (!room || room.phase !== "playing") {
     setStatus("Tunggu semua pemain siap.");
@@ -467,18 +531,38 @@ function submitOnlineCall(number) {
     return;
   }
 
-  if (room.calledNumbers.includes(Number(number))) {
-    setStatus(`#${number} sudah pernah dipilih.`);
+  const num = Number(number);
+  if (room.calledNumbers.includes(num)) {
+    setStatus(`#${num} sudah pernah dipilih.`);
     return;
   }
 
-  if (state.online.role === "host") {
-    handleOnlineCall(number, state.playerId);
-    return;
-  }
+  setStatus(`Memilih #${num}...`);
 
-  sendToHost({ type: "call-number", number: Number(number), playerId: state.playerId });
-  setStatus(`Kamu memilih #${number}. Mengirim ke semua pemain.`);
+  try {
+    const updatedCalledNumbers = [...room.calledNumbers, num];
+    const nextTurnIndex = (room.turnIndex + 1) % room.players.length;
+    const lastCall = {
+      id: makeId("call"),
+      number: num,
+      playerId: state.playerId,
+      playerName: state.playerName
+    };
+
+    const { error } = await supabase
+      .from("rooms")
+      .update({
+        called_numbers: updatedCalledNumbers,
+        last_call: lastCall,
+        turn_index: nextTurnIndex
+      })
+      .eq("code", room.code);
+
+    if (error) throw error;
+  } catch (err) {
+    console.error("Error submitting call:", err);
+    setStatus("Gagal memilih angka. Coba lagi.");
+  }
 }
 
 function applyRoomState(room) {
@@ -496,6 +580,10 @@ function applyRoomState(room) {
 
   if (room.phase === "setup" && !state.gameStarted) {
     beginGame("online");
+  }
+
+  if (room.phase === "setup" && state.online.role === "host") {
+    maybeStartTurns();
   }
 
   if (room.phase === "playing" && !state.gameStarted) {
@@ -610,27 +698,40 @@ function isMyTurn() {
   return getCurrentPlayer()?.id === state.playerId;
 }
 
-function maybeStartTurns() {
+async function maybeStartTurns() {
   const room = state.online.room;
   if (!room || state.online.role !== "host" || room.phase !== "setup") {
     return;
   }
 
   if (room.players.length > 0 && room.players.every((player) => player.ready)) {
-    room.phase = "playing";
     let startingIndex = -1;
     if (room.lastWinnerId) {
       startingIndex = room.players.findIndex((player) => player.id === room.lastWinnerId);
     }
+
+    let turnIndex = 0;
     if (startingIndex !== -1) {
-      room.turnIndex = startingIndex;
+      turnIndex = startingIndex;
     } else {
-      room.turnIndex = Math.floor(Math.random() * room.players.length);
+      turnIndex = Math.floor(Math.random() * room.players.length);
+    }
+
+    try {
+      await supabase
+        .from("rooms")
+        .update({
+          phase: "playing",
+          turn_index: turnIndex
+        })
+        .eq("code", room.code);
+    } catch (err) {
+      console.error("Error starting turns:", err);
     }
   }
 }
 
-function handleOnlineReady() {
+async function handleOnlineReady() {
   if (!isBoardFull()) {
     setStatus("Board harus penuh dulu sebelum siap main.");
     return;
@@ -640,81 +741,65 @@ function handleOnlineReady() {
   readyButton.disabled = true;
   readyButton.textContent = "Sudah siap";
 
-  if (state.online.role === "host") {
-    setPlayerReady(state.playerId, true);
-    maybeStartTurns();
-    broadcastRoomState();
-  } else {
-    sendToHost({ type: "ready", playerId: state.playerId });
-    setStatus("Kamu sudah siap. Menunggu pemain lain.");
+  if (state.mode === "online" && supabase && state.online.room) {
+    try {
+      const { error } = await supabase
+        .from("players")
+        .update({ ready: true })
+        .eq("id", state.playerId)
+        .eq("room_code", state.online.room.code);
+
+      if (error) throw error;
+      setStatus("Kamu sudah siap. Menunggu pemain lain.");
+
+      if (state.online.role === "host") {
+        await maybeStartTurns();
+      }
+    } catch (err) {
+      console.error("Error setting ready status:", err);
+      setStatus("Gagal mengirim status siap.");
+      readyButton.disabled = false;
+      readyButton.textContent = "Siap main";
+    }
   }
 }
 
-function startOnlineGame() {
+async function startOnlineGame() {
   const room = state.online.room;
   if (state.online.role !== "host" || !room) {
     setLobbyStatus("Tunggu host mulai game.");
     return;
   }
 
-  room.size = Number(boardSize.value);
-  room.phase = "setup";
-  ensureSelfInRoom(false);
-  room.players = room.players.map((player) => ({ ...player, ready: false }));
-  room.calledNumbers = [];
-  room.lastCall = null;
-  room.winner = null;
-  room.turnIndex = 0;
-  state.online.ready = false;
-  state.online.winnerReported = false;
-  state.winnerShown = false;
-  state.localWinnerAnnounced = false;
-  broadcastRoomState();
+  try {
+    await supabase
+      .from("players")
+      .update({ ready: false })
+      .eq("room_code", room.code);
+
+    await supabase
+      .from("rooms")
+      .update({
+        size: Number(boardSize.value),
+        phase: "setup",
+        called_numbers: [],
+        last_call: null,
+        winner: null,
+        turn_index: 0
+      })
+      .eq("code", room.code);
+
+    state.online.ready = false;
+    state.online.winnerReported = false;
+    state.winnerShown = false;
+    state.localWinnerAnnounced = false;
+  } catch (err) {
+    console.error("Error starting online game:", err);
+    setLobbyStatus("Gagal memulai game: " + err.message);
+  }
 }
 
-function handleOnlineWinner(player) {
-  const room = state.online.room;
-  if (!room || state.online.role !== "host" || room.winner) {
-    return;
-  }
-
-  room.winner = {
-    id: player.id,
-    name: player.name || "Pemain",
-  };
-  room.lastWinnerId = player.id;
-  broadcastRoomState();
-}
-
-function handleOnlineCall(number, playerId = state.playerId) {
-  const room = state.online.room;
-  if (!room || room.phase !== "playing") {
-    return;
-  }
-
-  const currentPlayer = getCurrentPlayer();
-  if (!currentPlayer || currentPlayer.id !== playerId) {
-    setStatus(`Sekarang giliran ${getCurrentPlayerName()}.`);
-    return;
-  }
-
-  if (room.calledNumbers.includes(Number(number))) {
-    setStatus(`#${number} sudah pernah dipilih.`);
-    return;
-  }
-
-  room.calledNumbers.push(Number(number));
-  room.lastCall = {
-    id: makeId("call"),
-    number: Number(number),
-    playerId,
-    playerName: currentPlayer.name,
-  };
-  room.turnIndex = (room.turnIndex + 1) % room.players.length;
-  broadcastRoomState();
-}
-
-function announceWinner() {
+async function announceWinner() {
   if (state.mode === "online") {
     const room = state.online.room;
     if (!room || room.phase !== "playing" || room.winner || state.online.winnerReported) {
@@ -724,12 +809,21 @@ function announceWinner() {
     state.online.winnerReported = true;
     const player = getSelfPlayer(true);
 
-    if (state.online.role === "host") {
-      handleOnlineWinner(player);
-      return;
+    try {
+      await supabase
+        .from("rooms")
+        .update({
+          winner: {
+            id: player.id,
+            name: player.name || "Pemain"
+          },
+          last_winner_id: player.id
+        })
+        .eq("code", room.code)
+        .is("winner", null);
+    } catch (err) {
+      console.error("Error setting winner:", err);
     }
-
-    sendToHost({ type: "winner", player });
     return;
   }
 
@@ -1331,7 +1425,7 @@ brightnessSlider.addEventListener("input", () => {
   setTheme({ ...state.theme, lightness: Number(brightnessSlider.value) });
 });
 startButton.addEventListener("click", startGame);
-newGameButton.addEventListener("click", () => {
+newGameButton.addEventListener("click", async () => {
   const mode = state.mode;
   if (mode === "online") {
     if (state.online.role !== "host") {
@@ -1341,14 +1435,28 @@ newGameButton.addEventListener("click", () => {
 
     const room = state.online.room;
     if (room) {
-      room.phase = "lobby";
-      room.players = room.players.map((player) => ({ ...player, ready: false }));
-      room.calledNumbers = [];
-      room.lastCall = null;
-      room.winner = null;
-      room.turnIndex = 0;
-      leaveGameForSetup();
-      broadcastRoomState();
+      try {
+        await supabase
+          .from("players")
+          .update({ ready: false })
+          .eq("room_code", room.code);
+
+        await supabase
+          .from("rooms")
+          .update({
+            phase: "lobby",
+            called_numbers: [],
+            last_call: null,
+            winner: null,
+            turn_index: 0
+          })
+          .eq("code", room.code);
+
+        leaveGameForSetup();
+      } catch (err) {
+        console.error("Error resetting room:", err);
+        setStatus("Gagal membuat game baru.");
+      }
     }
     return;
   }
@@ -1398,6 +1506,22 @@ window.addEventListener("beforeunload", (event) => {
 });
 window.addEventListener("popstate", handleHistoryBack);
 
+window.addEventListener("pagehide", () => {
+  if (state.mode === "online" && supabase && state.online.room) {
+    const url = `${localStorage.getItem("bibingo-supabase-url")}/rest/v1/players?id=eq.${state.playerId}&room_code=eq.${state.online.room.code}`;
+    const headers = {
+      "apikey": localStorage.getItem("bibingo-supabase-key"),
+      "Authorization": `Bearer ${localStorage.getItem("bibingo-supabase-key")}`
+    };
+    fetch(url, {
+      method: "DELETE",
+      headers: headers,
+      keepalive: true
+    });
+  }
+});
+
 setSize(MIN_SIZE);
 setTheme(loadTheme());
 setMode("local");
+initSupabase();

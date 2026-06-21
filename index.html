@@ -28,6 +28,7 @@
               <button class="secondary-button" id="joinRoomButton" type="button">Join room</button>
             </div>
             <button class="ghost-button full-button" id="offlineButton" type="button">Main offline</button>
+            <button class="ghost-button full-button" id="setupSupabaseButton" type="button" style="margin-top: 5px;">Konfigurasi Supabase</button>
             <p class="room-code hidden" id="roomCodeDisplay"></p>
             <p class="lobby-status" id="lobbyStatus">Masukkan nama, lalu create atau join room.</p>
             <div class="player-list hidden" id="playerList" aria-label="Daftar pemain"></div>
@@ -179,7 +180,28 @@
       </div>
     </div>
 
-    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+    <div class="modal-overlay hidden" id="supabaseModal" role="dialog" aria-modal="true" aria-labelledby="supabaseTitle">
+      <div class="confirm-card">
+        <h3 id="supabaseTitle">Konfigurasi Supabase</h3>
+        <p>Masukkan kredensial Supabase untuk mengaktifkan mode multiplayer online.</p>
+        <div style="display: grid; gap: 10px; text-align: left; margin: 15px 0;">
+          <div>
+            <label for="supabaseUrlInput" style="display: block; font-size: 0.85rem; font-weight: 800; margin-bottom: 4px;">Supabase URL</label>
+            <input id="supabaseUrlInput" type="text" placeholder="https://xyz.supabase.co" autocomplete="off" />
+          </div>
+          <div>
+            <label for="supabaseKeyInput" style="display: block; font-size: 0.85rem; font-weight: 800; margin-bottom: 4px;">Supabase Anon Key</label>
+            <input id="supabaseKeyInput" type="password" placeholder="eyJhbGciOiJIUzI1NiIsIn..." autocomplete="off" />
+          </div>
+        </div>
+        <div class="confirm-actions">
+          <button class="ghost-button" id="cancelSupabaseButton" type="button">Batal</button>
+          <button class="primary-button" id="saveSupabaseButton" type="button">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
   </body>
 </html>
