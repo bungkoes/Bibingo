@@ -116,6 +116,7 @@ function showLobby() {
   lobbyScreen.classList.remove("hidden");
   setupScreen.classList.add("hidden");
   gameScreen.classList.add("hidden");
+  startLobbyPolling();
 }
 
 function showSetup() {
@@ -125,6 +126,7 @@ function showSetup() {
   updateSetupRoomInfo();
   updateSetupControls();
   startButton.disabled = state.mode === "online" && state.online.role !== "host";
+  stopLobbyPolling();
 }
 
 function leaveGameForSetup() {
@@ -188,6 +190,93 @@ function ensureSelfInRoom(ready = false) {
 let supabaseClient = null;
 let activeChannel = null;
 let heartbeatInterval = null;
+let lobbyPollInterval = null;
+
+function startLobbyPolling() {
+  if (lobbyPollInterval) clearInterval(lobbyPollInterval);
+  fetchAvailableRooms();
+  lobbyPollInterval = setInterval(() => {
+    if (!state.gameStarted && supabaseClient && lobbyScreen && !lobbyScreen.classList.contains("hidden")) {
+      fetchAvailableRooms();
+    } else {
+      stopLobbyPolling();
+    }
+  }, 10000);
+}
+
+function stopLobbyPolling() {
+  if (lobbyPollInterval) {
+    clearInterval(lobbyPollInterval);
+    lobbyPollInterval = null;
+  }
+}
+
+async function fetchAvailableRooms() {
+  if (!supabaseClient) return;
+  const listContainer = document.querySelector("#availableRoomsList");
+  if (!listContainer) return;
+
+  try {
+    const { data: dbRooms, error: roomsError } = await supabaseClient
+      .from("rooms")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (roomsError) throw roomsError;
+
+    if (!dbRooms || dbRooms.length === 0) {
+      listContainer.innerHTML = `<p style="color: var(--muted); font-size: 0.85rem; font-style: italic; margin: 0; text-align: center;">Tidak ada room aktif saat ini.</p>`;
+      return;
+    }
+
+    const { data: dbPlayers, error: playersError } = await supabaseClient
+      .from("players")
+      .select("room_code");
+
+    if (playersError) throw playersError;
+
+    const playerCounts = {};
+    dbPlayers.forEach((player) => {
+      playerCounts[player.room_code] = (playerCounts[player.room_code] || 0) + 1;
+    });
+
+    listContainer.innerHTML = dbRooms
+      .map((room) => {
+        const count = playerCounts[room.code] || 0;
+        const phaseLabel = room.phase === "playing" ? "Bermain" : room.phase === "setup" ? "Setup" : "Lobby";
+        const badgeColor = room.phase === "playing" ? "var(--coral)" : room.phase === "setup" ? "var(--blue)" : "var(--green-dark)";
+        
+        return `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 0.9rem; gap: 10px;">
+            <div style="display: flex; flex-direction: column; text-align: left;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <strong style="color: var(--green-dark); font-size: 0.95rem;">${escapeHtml(room.code)}</strong>
+                <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: white; background: ${badgeColor}; text-transform: uppercase;">${phaseLabel}</span>
+              </div>
+              <span style="color: var(--muted); font-size: 0.78rem; margin-top: 2px;">Pemain: ${count}</span>
+            </div>
+            <button class="secondary-button" style="min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0;" onclick="joinRoomByCode('${escapeHtml(room.code)}')">Join</button>
+          </div>
+        `;
+      })
+      .join("");
+  } catch (err) {
+    console.error("Gagal mengambil daftar room:", err);
+    listContainer.innerHTML = `<p style="color: var(--coral); font-size: 0.85rem; margin: 0; text-align: center;">Gagal memuat room.</p>`;
+  }
+}
+
+window.joinRoomByCode = (code) => {
+  const nameInput = document.querySelector("#playerName");
+  if (!nameInput.value.trim()) {
+    setLobbyStatus("Tulis nama kamu dulu sebelum join room!");
+    nameInput.focus();
+    return;
+  }
+  roomCodeInput.value = code;
+  joinRoom();
+};
 
 function initSupabase() {
   const url = DEFAULT_SUPABASE_URL;
@@ -333,6 +422,8 @@ async function resetOnlineRoom() {
     clearInterval(heartbeatInterval);
     heartbeatInterval = null;
   }
+
+  stopLobbyPolling();
 
   await deleteSelfFromRoom();
 
@@ -1558,4 +1649,6 @@ playerNameInput.addEventListener("input", () => {
 setSize(MIN_SIZE);
 setTheme(loadTheme());
 setMode("local");
-initSupabase();
+if (initSupabase()) {
+  startLobbyPolling();
+}
