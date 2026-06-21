@@ -7,6 +7,16 @@ const ROOM_PREFIX = "bibingo-room-";
 const DEFAULT_SUPABASE_URL = "https://dvabhbvilbbebrjuwhkb.supabase.co";
 const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YWJoYnZpbGJiZWJyanV3aGtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNTM3MzYsImV4cCI6MjA5NzYyOTczNn0.qX__u6GoYspMqRMCNJojQxYaXYe8KZknNecM2AQvs9E";
 
+function getOrCreatePlayerId() {
+  let id = localStorage.getItem("bibingo-player-id");
+  if (!id) {
+    const random = Math.random().toString(36).slice(2, 8);
+    id = `player-${Date.now().toString(36)}-${random}`;
+    localStorage.setItem("bibingo-player-id", id);
+  }
+  return id;
+}
+
 const state = {
   size: MIN_SIZE,
   theme: { ...DEFAULT_THEME },
@@ -20,7 +30,7 @@ const state = {
   mode: "local",
   winnerShown: false,
   localWinnerAnnounced: false,
-  playerId: makeId("player"),
+  playerId: getOrCreatePlayerId(),
   playerName: "",
   online: {
     role: null,
@@ -124,6 +134,13 @@ function leaveGameForSetup() {
   state.online.winnerReported = false;
   state.winnerShown = false;
   state.localWinnerAnnounced = false;
+
+  if (state.mode === "online" && state.online.room) {
+    const roomCode = state.online.room.code;
+    localStorage.removeItem(`bibingo-board-cells-${state.playerId}-${roomCode}`);
+    localStorage.removeItem(`bibingo-board-marked-${state.playerId}-${roomCode}`);
+  }
+
   state.cells = [];
   state.marked.clear();
   state.selectedIndex = null;
@@ -905,6 +922,37 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function saveLocalBoardState() {
+  if (state.mode === "online" && state.online.room) {
+    const roomCode = state.online.room.code;
+    const cellsKey = `bibingo-board-cells-${state.playerId}-${roomCode}`;
+    const markedKey = `bibingo-board-marked-${state.playerId}-${roomCode}`;
+    localStorage.setItem(cellsKey, JSON.stringify(state.cells));
+    localStorage.setItem(markedKey, JSON.stringify(Array.from(state.marked)));
+  }
+}
+
+function restoreLocalBoardState(roomCode) {
+  const cellsKey = `bibingo-board-cells-${state.playerId}-${roomCode}`;
+  const markedKey = `bibingo-board-marked-${state.playerId}-${roomCode}`;
+  try {
+    const savedCells = localStorage.getItem(cellsKey);
+    const savedMarked = localStorage.getItem(markedKey);
+    if (savedCells) {
+      state.cells = JSON.parse(savedCells);
+      if (savedMarked) {
+        state.marked = new Set(JSON.parse(savedMarked));
+      } else {
+        state.marked.clear();
+      }
+      return true;
+    }
+  } catch (e) {
+    console.error("Gagal restore board dari localStorage:", e);
+  }
+  return false;
+}
+
 function startGame() {
   if (state.mode === "online") {
     startOnlineGame();
@@ -923,8 +971,17 @@ function beginGame(mode = state.mode) {
   state.mode = mode;
   state.gameStarted = true;
   activateHistoryGuard();
-  state.cells = Array.from({ length: state.size * state.size }, () => "");
-  state.marked.clear();
+
+  let boardRestored = false;
+  if (mode === "online" && state.online.room) {
+    boardRestored = restoreLocalBoardState(state.online.room.code);
+  }
+
+  if (!boardRestored) {
+    state.cells = Array.from({ length: state.size * state.size }, () => "");
+    state.marked.clear();
+  }
+
   state.selectedIndex = null;
   state.entry = "";
   state.completedLines = [];
@@ -934,6 +991,7 @@ function beginGame(mode = state.mode) {
   state.localWinnerAnnounced = false;
   closeWinner();
   currentSize.textContent = `${state.size} x ${state.size}`;
+  lobbyScreen.classList.add("hidden");
   setupScreen.classList.add("hidden");
   gameScreen.classList.remove("hidden");
   fillRandomButton.classList.remove("hidden");
@@ -1037,6 +1095,7 @@ async function handleCellClick(index) {
   state.completedLines = findCompletedLines();
   renderBoard();
   updateBingo();
+  saveLocalBoardState();
 }
 
 function fillRandom() {
@@ -1056,6 +1115,7 @@ function fillRandom() {
   renderBoard();
   updateBingo();
   updateNumpadState();
+  saveLocalBoardState();
   setStatus("Board sudah terisi random. Ketik angka lalu OK, atau tap angka untuk menandai.");
 }
 
@@ -1073,6 +1133,7 @@ function clearBoard() {
   renderBoard();
   updateBingo();
   updateNumpadState();
+  saveLocalBoardState();
   setStatus("Board dikosongkan. Pilih mode random atau isi sendiri.");
 }
 
@@ -1146,6 +1207,7 @@ function applyNumber() {
   renderBoard();
   updateBingo();
   updateNumpadState();
+  saveLocalBoardState();
   if (nextIndex === null) {
     setStatus(state.mode === "online" ? "Board penuh. Tekan Siap main." : "Semua kolom sudah terisi. Tap angka untuk menandai.");
   } else {
@@ -1486,6 +1548,11 @@ window.addEventListener("pagehide", () => {
       keepalive: true
     });
   }
+});
+
+playerNameInput.value = localStorage.getItem("bibingo-player-name") || "";
+playerNameInput.addEventListener("input", () => {
+  localStorage.setItem("bibingo-player-name", playerNameInput.value.trim());
 });
 
 setSize(MIN_SIZE);
