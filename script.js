@@ -221,14 +221,9 @@ async function fetchAvailableRooms() {
       .from("rooms")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(50);
 
     if (roomsError) throw roomsError;
-
-    if (!dbRooms || dbRooms.length === 0) {
-      listContainer.innerHTML = `<p style="color: var(--muted); font-size: 0.85rem; font-style: italic; margin: 0; text-align: center;">Tidak ada room aktif saat ini.</p>`;
-      return;
-    }
 
     const { data: dbPlayers, error: playersError } = await supabaseClient
       .from("players")
@@ -241,7 +236,41 @@ async function fetchAvailableRooms() {
       playerCounts[player.room_code] = (playerCounts[player.room_code] || 0) + 1;
     });
 
-    listContainer.innerHTML = dbRooms
+    const now = new Date();
+    const staleRoomCodes = [];
+    const activeRooms = [];
+
+    dbRooms.forEach((room) => {
+      const count = playerCounts[room.code] || 0;
+      const createdAt = new Date(room.created_at);
+      const ageInMinutes = (now - createdAt) / (1000 * 60);
+
+      if (count === 0 && ageInMinutes > 30) {
+        staleRoomCodes.push(room.code);
+      } else {
+        activeRooms.push(room);
+      }
+    });
+
+    if (staleRoomCodes.length > 0) {
+      console.log("Menghapus room kosong > 30 menit:", staleRoomCodes);
+      supabaseClient
+        .from("rooms")
+        .delete()
+        .in("code", staleRoomCodes)
+        .then(({ error }) => {
+          if (error) console.error("Gagal menghapus room kosong:", error);
+        });
+    }
+
+    const roomsToRender = activeRooms.slice(0, 10);
+
+    if (roomsToRender.length === 0) {
+      listContainer.innerHTML = `<p style="color: var(--muted); font-size: 0.85rem; font-style: italic; margin: 0; text-align: center;">Tidak ada room aktif saat ini.</p>`;
+      return;
+    }
+
+    listContainer.innerHTML = roomsToRender
       .map((room) => {
         const count = playerCounts[room.code] || 0;
         const phaseLabel = room.phase === "playing" ? "Bermain" : room.phase === "setup" ? "Setup" : "Lobby";
