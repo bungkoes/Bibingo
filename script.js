@@ -233,7 +233,7 @@ async function fetchAndSyncRoom(roomCode) {
       .from("players")
       .select("*")
       .eq("room_code", roomCode)
-      .order("last_active_at", { ascending: true });
+      .order("id", { ascending: true });
 
     if (playersError) throw playersError;
 
