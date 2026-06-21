@@ -173,44 +173,9 @@ let supabase = null;
 let activeChannel = null;
 let heartbeatInterval = null;
 
-const supabaseModal = document.querySelector("#supabaseModal");
-const setupSupabaseButton = document.querySelector("#setupSupabaseButton");
-const cancelSupabaseButton = document.querySelector("#cancelSupabaseButton");
-const saveSupabaseButton = document.querySelector("#saveSupabaseButton");
-const supabaseUrlInput = document.querySelector("#supabaseUrlInput");
-const supabaseKeyInput = document.querySelector("#supabaseKeyInput");
-
-setupSupabaseButton.addEventListener("click", () => {
-  supabaseUrlInput.value = localStorage.getItem("bibingo-supabase-url") || "";
-  supabaseKeyInput.value = localStorage.getItem("bibingo-supabase-key") || "";
-  supabaseModal.classList.remove("hidden");
-});
-
-cancelSupabaseButton.addEventListener("click", () => {
-  supabaseModal.classList.add("hidden");
-});
-
-saveSupabaseButton.addEventListener("click", () => {
-  const url = supabaseUrlInput.value.trim();
-  const key = supabaseKeyInput.value.trim();
-  if (!url || !key) {
-    alert("URL dan Anon Key harus diisi!");
-    return;
-  }
-  localStorage.setItem("bibingo-supabase-url", url);
-  localStorage.setItem("bibingo-supabase-key", key);
-  supabaseModal.classList.add("hidden");
-  
-  if (initSupabase()) {
-    setLobbyStatus("Supabase berhasil dikonfigurasi.");
-  } else {
-    setLobbyStatus("Gagal menginisialisasi Supabase.");
-  }
-});
-
 function initSupabase() {
-  const url = localStorage.getItem("bibingo-supabase-url") || DEFAULT_SUPABASE_URL;
-  const key = localStorage.getItem("bibingo-supabase-key") || DEFAULT_SUPABASE_KEY;
+  const url = DEFAULT_SUPABASE_URL;
+  const key = DEFAULT_SUPABASE_KEY;
   if (url && key) {
     try {
       supabase = window.supabase.createClient(url, key);
@@ -225,8 +190,7 @@ function initSupabase() {
 function checkSupabaseConfigured() {
   if (!supabase) {
     if (!initSupabase()) {
-      supabaseModal.classList.remove("hidden");
-      setLobbyStatus("Konfigurasi Supabase terlebih dahulu!");
+      setLobbyStatus("Koneksi online dinonaktifkan (kredensial Supabase kosong di script.js).");
       return false;
     }
   }
