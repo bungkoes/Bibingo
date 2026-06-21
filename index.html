@@ -101,6 +101,7 @@
           </fieldset>
 
           <button class="primary-button" id="startButton" type="button">Start game</button>
+          <button class="ghost-button full-button" id="backToLobbyFromSetupButton" type="button" style="margin-top: 10px;">Kembali ke Lobby</button>
         </div>
       </section>
 
@@ -110,7 +111,10 @@
             <p class="eyebrow">Bibingo</p>
             <h2 id="gameTitle">Board <span id="currentSize">5 x 5</span></h2>
           </div>
-          <button class="ghost-button" id="newGameButton" type="button">Game baru</button>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="ghost-button" id="exitToLobbyButton" type="button">Keluar Room</button>
+            <button class="ghost-button" id="newGameButton" type="button">Game baru</button>
+          </div>
         </header>
 
         <section class="game-toolbar" aria-label="Aksi board">

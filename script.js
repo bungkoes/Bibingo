@@ -51,6 +51,8 @@ const decreaseSize = document.querySelector("#decreaseSize");
 const increaseSize = document.querySelector("#increaseSize");
 const startButton = document.querySelector("#startButton");
 const newGameButton = document.querySelector("#newGameButton");
+const exitToLobbyButton = document.querySelector("#exitToLobbyButton");
+const backToLobbyFromSetupButton = document.querySelector("#backToLobbyFromSetupButton");
 const currentSize = document.querySelector("#currentSize");
 const fillRandomButton = document.querySelector("#fillRandomButton");
 const clearBoardButton = document.querySelector("#clearBoardButton");
@@ -1669,6 +1671,26 @@ window.addEventListener("pagehide", () => {
     });
   }
 });
+
+async function exitToLobby() {
+  let shouldExit = true;
+  if (state.gameStarted) {
+    shouldExit = await showConfirm("Apakah kamu yakin ingin keluar dari room dan kembali ke lobby?", {
+      title: "Keluar Room?",
+      acceptLabel: "Keluar",
+      cancelLabel: "Batal"
+    });
+  }
+
+  if (shouldExit) {
+    await resetOnlineRoom();
+    state.gameStarted = false;
+    showLobby();
+  }
+}
+
+exitToLobbyButton.addEventListener("click", exitToLobby);
+backToLobbyFromSetupButton.addEventListener("click", exitToLobby);
 
 playerNameInput.value = localStorage.getItem("bibingo-player-name") || "";
 playerNameInput.addEventListener("input", () => {
