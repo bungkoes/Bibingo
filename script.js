@@ -168,7 +168,7 @@ function ensureSelfInRoom(ready = false) {
   }
 }
 
-let supabase = null;
+let supabaseClient = null;
 let activeChannel = null;
 let heartbeatInterval = null;
 
@@ -177,7 +177,7 @@ function initSupabase() {
   const key = DEFAULT_SUPABASE_KEY;
   if (url && key) {
     try {
-      supabase = window.supabase.createClient(url, key);
+      supabaseClient = window.supabase.createClient(url, key);
       return true;
     } catch (e) {
       console.error("Gagal inisialisasi Supabase client:", e);
@@ -187,7 +187,7 @@ function initSupabase() {
 }
 
 function checkSupabaseConfigured() {
-  if (!supabase) {
+  if (!supabaseClient) {
     if (!initSupabase()) {
       setLobbyStatus("Koneksi online dinonaktifkan (kredensial Supabase kosong di script.js).");
       return false;
@@ -217,9 +217,9 @@ function convertDbRoomToStateRoom(dbRoom, dbPlayers) {
 }
 
 async function fetchAndSyncRoom(roomCode) {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   try {
-    const { data: rooms, error: roomError } = await supabase
+    const { data: rooms, error: roomError } = await supabaseClient
       .from("rooms")
       .select("*")
       .eq("code", roomCode);
@@ -229,7 +229,7 @@ async function fetchAndSyncRoom(roomCode) {
 
     const dbRoom = rooms[0];
 
-    const { data: dbPlayers, error: playersError } = await supabase
+    const { data: dbPlayers, error: playersError } = await supabaseClient
       .from("players")
       .select("*")
       .eq("room_code", roomCode)
@@ -245,12 +245,12 @@ async function fetchAndSyncRoom(roomCode) {
 }
 
 function subscribeToRoom(roomCode) {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   if (activeChannel) {
     activeChannel.unsubscribe();
   }
 
-  activeChannel = supabase.channel(`room-channel-${roomCode}`)
+  activeChannel = supabaseClient.channel(`room-channel-${roomCode}`)
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "rooms", filter: `code=eq.${roomCode}` },
@@ -276,12 +276,12 @@ function subscribeToRoom(roomCode) {
 function startPlayerHeartbeat(roomCode) {
   if (heartbeatInterval) clearInterval(heartbeatInterval);
   heartbeatInterval = setInterval(async () => {
-    if (state.mode !== "online" || !supabase) {
+    if (state.mode !== "online" || !supabaseClient) {
       clearInterval(heartbeatInterval);
       return;
     }
     try {
-      await supabase
+      await supabaseClient
         .from("players")
         .update({ last_active_at: new Date().toISOString() })
         .eq("id", state.playerId)
@@ -293,9 +293,9 @@ function startPlayerHeartbeat(roomCode) {
 }
 
 async function deleteSelfFromRoom() {
-  if (state.mode === "online" && supabase && state.online.room) {
+  if (state.mode === "online" && supabaseClient && state.online.room) {
     try {
-      await supabase
+      await supabaseClient
         .from("players")
         .delete()
         .eq("id", state.playerId)
@@ -357,14 +357,14 @@ async function createRoom() {
   startButton.disabled = true;
 
   try {
-    const { error: roomError } = await supabase
+    const { error: roomError } = await supabaseClient
       .from("rooms")
       .insert(roomData);
 
     if (roomError) throw roomError;
 
     const player = getSelfPlayer(false);
-    const { error: playerError } = await supabase
+    const { error: playerError } = await supabaseClient
       .from("players")
       .insert({
         id: player.id,
@@ -410,7 +410,7 @@ async function joinRoom() {
   setLobbyStatus("Menghubungkan ke room...");
 
   try {
-    const { data: rooms, error: roomError } = await supabase
+    const { data: rooms, error: roomError } = await supabaseClient
       .from("rooms")
       .select("*")
       .eq("code", code);
@@ -423,7 +423,7 @@ async function joinRoom() {
     }
 
     const player = getSelfPlayer(false);
-    const { error: playerError } = await supabase
+    const { error: playerError } = await supabaseClient
       .from("players")
       .upsert({
         id: player.id,
@@ -516,7 +516,7 @@ async function submitOnlineCall(number) {
       playerName: state.playerName
     };
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("rooms")
       .update({
         called_numbers: updatedCalledNumbers,
@@ -685,7 +685,7 @@ async function maybeStartTurns() {
     }
 
     try {
-      await supabase
+      await supabaseClient
         .from("rooms")
         .update({
           phase: "playing",
@@ -708,9 +708,9 @@ async function handleOnlineReady() {
   readyButton.disabled = true;
   readyButton.textContent = "Sudah siap";
 
-  if (state.mode === "online" && supabase && state.online.room) {
+  if (state.mode === "online" && supabaseClient && state.online.room) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("players")
         .update({ ready: true })
         .eq("id", state.playerId)
@@ -739,12 +739,12 @@ async function startOnlineGame() {
   }
 
   try {
-    await supabase
+    await supabaseClient
       .from("players")
       .update({ ready: false })
       .eq("room_code", room.code);
 
-    await supabase
+    await supabaseClient
       .from("rooms")
       .update({
         size: Number(boardSize.value),
@@ -777,7 +777,7 @@ async function announceWinner() {
     const player = getSelfPlayer(true);
 
     try {
-      await supabase
+      await supabaseClient
         .from("rooms")
         .update({
           winner: {
@@ -1403,12 +1403,12 @@ newGameButton.addEventListener("click", async () => {
     const room = state.online.room;
     if (room) {
       try {
-        await supabase
+        await supabaseClient
           .from("players")
           .update({ ready: false })
           .eq("room_code", room.code);
 
-        await supabase
+        await supabaseClient
           .from("rooms")
           .update({
             phase: "lobby",
@@ -1474,11 +1474,11 @@ window.addEventListener("beforeunload", (event) => {
 window.addEventListener("popstate", handleHistoryBack);
 
 window.addEventListener("pagehide", () => {
-  if (state.mode === "online" && supabase && state.online.room) {
-    const url = `${localStorage.getItem("bibingo-supabase-url")}/rest/v1/players?id=eq.${state.playerId}&room_code=eq.${state.online.room.code}`;
+  if (state.mode === "online" && supabaseClient && state.online.room) {
+    const url = `${DEFAULT_SUPABASE_URL}/rest/v1/players?id=eq.${state.playerId}&room_code=eq.${state.online.room.code}`;
     const headers = {
-      "apikey": localStorage.getItem("bibingo-supabase-key"),
-      "Authorization": `Bearer ${localStorage.getItem("bibingo-supabase-key")}`
+      "apikey": DEFAULT_SUPABASE_KEY,
+      "Authorization": `Bearer ${DEFAULT_SUPABASE_KEY}`
     };
     fetch(url, {
       method: "DELETE",
