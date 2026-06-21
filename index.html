@@ -8,7 +8,7 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="setup-screen" id="setupScreen" aria-labelledby="appTitle">
+      <section class="setup-screen" id="lobbyScreen" aria-labelledby="appTitle">
         <div class="brand-row">
           <div class="brand-mark">B</div>
           <div>
@@ -17,6 +17,39 @@
         </div>
 
         <div class="setup-panel">
+          <fieldset class="online-setup">
+            <legend>Masuk game</legend>
+            <label for="playerName">Nama pemain</label>
+            <input id="playerName" type="text" maxlength="18" placeholder="Tulis nama kamu" autocomplete="nickname" />
+
+            <button class="primary-button" id="createRoomButton" type="button">Create room</button>
+            <div class="join-row">
+              <input id="roomCodeInput" type="text" maxlength="24" placeholder="Kode room" autocomplete="off" />
+              <button class="secondary-button" id="joinRoomButton" type="button">Join room</button>
+            </div>
+            <button class="ghost-button full-button" id="offlineButton" type="button">Main offline</button>
+            <p class="room-code hidden" id="roomCodeDisplay"></p>
+            <p class="lobby-status" id="lobbyStatus">Masukkan nama, lalu create atau join room.</p>
+            <div class="player-list hidden" id="playerList" aria-label="Daftar pemain"></div>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="setup-screen hidden" id="setupScreen" aria-labelledby="setupTitle">
+        <div class="brand-row">
+          <div class="brand-mark">B</div>
+          <div>
+            <h1 id="setupTitle">Bibingo</h1>
+          </div>
+        </div>
+
+        <div class="setup-panel">
+          <div class="setup-room-info hidden" id="setupRoomInfo">
+            <span class="panel-label">Room</span>
+            <strong id="setupRoomCode">-</strong>
+            <div class="online-players" id="setupPlayers"></div>
+          </div>
+
           <label for="boardSize">Ukuran board</label>
           <div class="size-control">
             <button class="icon-button" id="decreaseSize" type="button" aria-label="Kurangi ukuran">
@@ -61,7 +94,7 @@
             </div>
           </fieldset>
 
-          <button class="primary-button" id="startButton" type="button">Start</button>
+          <button class="primary-button" id="startButton" type="button">Start game</button>
         </div>
       </section>
 
@@ -77,6 +110,19 @@
         <section class="game-toolbar" aria-label="Aksi board">
           <button class="secondary-button" id="fillRandomButton" type="button">Isi random</button>
           <button class="secondary-button" id="clearBoardButton" type="button">Kosongkan</button>
+          <button class="secondary-button hidden" id="readyButton" type="button">Siap main</button>
+        </section>
+
+        <section class="online-panel hidden" id="onlinePanel" aria-label="Info online">
+          <div>
+            <span class="panel-label">Room</span>
+            <strong id="gameRoomCode">-</strong>
+          </div>
+          <div>
+            <span class="panel-label">Giliran</span>
+            <strong id="turnPlayer">Menunggu pemain</strong>
+          </div>
+          <div class="online-players" id="gamePlayers"></div>
         </section>
 
         <section class="bingo-word" id="bingoWord" aria-label="Progress bingo"></section>
@@ -122,6 +168,18 @@
       </div>
     </div>
 
+    <div class="modal-overlay hidden" id="winnerModal" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
+      <div class="confirm-card winner-card">
+        <div class="confirm-icon winner-icon">B</div>
+        <h3 id="winnerTitle">Bingo!</h3>
+        <p id="winnerMessage">Pemenangnya sudah muncul.</p>
+        <div class="confirm-actions single-action">
+          <button class="primary-button" id="closeWinnerButton" type="button">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
     <script src="script.js"></script>
   </body>
 </html>
