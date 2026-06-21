@@ -4,9 +4,8 @@ const BINGO_BASE = ["B", "I", "N", "G", "O"];
 const DEFAULT_THEME = { hue: 156, saturation: 72, lightness: 27 };
 const ROOM_PREFIX = "bibingo-room-";
 
-// Masukkan URL dan Anon Key Supabase Anda di sini agar pemain tidak perlu menginputnya lagi di browser
-const DEFAULT_SUPABASE_URL = "";
-const DEFAULT_SUPABASE_KEY = "";
+const DEFAULT_SUPABASE_URL = "https://dvabhbvilbbebrjuwhkb.supabase.co";
+const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YWJoYnZpbGJiZWJyanV3aGtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNTM3MzYsImV4cCI6MjA5NzYyOTczNn0.qX__u6GoYspMqRMCNJojQxYaXYe8KZknNecM2AQvs9E";
 
 const state = {
   size: MIN_SIZE,
