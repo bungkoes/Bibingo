@@ -47,8 +47,6 @@ const lobbyScreen = document.querySelector("#lobbyScreen");
 const setupScreen = document.querySelector("#setupScreen");
 const gameScreen = document.querySelector("#gameScreen");
 const boardSize = document.querySelector("#boardSize");
-const decreaseSize = document.querySelector("#decreaseSize");
-const increaseSize = document.querySelector("#increaseSize");
 const startButton = document.querySelector("#startButton");
 const newGameButton = document.querySelector("#newGameButton");
 const exitToLobbyButton = document.querySelector("#exitToLobbyButton");
@@ -91,7 +89,6 @@ const setupPlayers = document.querySelector("#setupPlayers");
 const readyButton = document.querySelector("#readyButton");
 const onlinePanel = document.querySelector("#onlinePanel");
 const gameRoomCode = document.querySelector("#gameRoomCode");
-const turnPlayer = document.querySelector("#turnPlayer");
 const gamePlayers = document.querySelector("#gamePlayers");
 let bingoLetters = [];
 let confirmResolver = null;
@@ -103,13 +100,15 @@ function makeId(prefix = "id") {
 
 function getPlayerName() {
   const name = playerNameInput.value.trim();
-  return name || "Pemain";
+  return name || "Player";
 }
 
 function setMode(mode) {
   state.mode = mode;
-  startButton.textContent = mode === "online" ? "Start online" : "Start offline";
-  startButton.disabled = mode === "online" && state.online.role !== "host";
+  startButton.textContent = "Start Game";
+  const isClientInOnline = mode === "online" && state.online.role !== "host";
+  startButton.classList.toggle("hidden", isClientInOnline);
+  startButton.disabled = isClientInOnline;
   setupRoomInfo.classList.toggle("hidden", mode !== "online");
   updateSetupControls();
 }
@@ -127,7 +126,9 @@ function showSetup() {
   gameScreen.classList.add("hidden");
   updateSetupRoomInfo();
   updateSetupControls();
-  startButton.disabled = state.mode === "online" && state.online.role !== "host";
+  const isClientInOnline = state.mode === "online" && state.online.role !== "host";
+  startButton.classList.toggle("hidden", isClientInOnline);
+  startButton.disabled = isClientInOnline;
   stopLobbyPolling();
 }
 
@@ -151,7 +152,7 @@ function leaveGameForSetup() {
   state.entry = "";
   state.completedLines = [];
   readyButton.disabled = false;
-  readyButton.textContent = "Siap main";
+  readyButton.textContent = "READY!";
   showSetup();
 }
 
@@ -259,27 +260,33 @@ async function fetchAvailableRooms() {
     });
 
     if (staleRoomCodes.length > 0) {
-      console.log("Menghapus room kosong > 30 menit:", staleRoomCodes);
+      console.log("Deleting empty rooms > 30 minutes:", staleRoomCodes);
       supabaseClient
         .from("rooms")
         .delete()
         .in("code", staleRoomCodes)
         .then(({ error }) => {
-          if (error) console.error("Gagal menghapus room kosong:", error);
+          if (error) console.error("Failed to delete empty rooms:", error);
         });
     }
 
     const roomsToRender = activeRooms.slice(0, 10);
 
     if (roomsToRender.length === 0) {
-      listContainer.innerHTML = `<p style="color: var(--muted); font-size: 0.85rem; font-style: italic; margin: 0; text-align: center;">Tidak ada room aktif saat ini.</p>`;
+      listContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🎮</div>
+          <div class="empty-title">No Active Rooms</div>
+          <div class="empty-desc">Create a new room above to start playing online.</div>
+        </div>
+      `;
       return;
     }
 
     listContainer.innerHTML = roomsToRender
       .map((room) => {
         const count = playerCounts[room.code] || 0;
-        const phaseLabel = room.phase === "playing" ? "Bermain" : room.phase === "setup" ? "Setup" : "Lobby";
+        const phaseLabel = room.phase === "playing" ? "Playing" : room.phase === "setup" ? "Setup" : "Lobby";
         const badgeColor = room.phase === "playing" ? "var(--coral)" : room.phase === "setup" ? "var(--blue)" : "var(--green-dark)";
         const isMember = memberRooms.has(room.code);
         const canJoin = room.phase === "lobby" || isMember;
@@ -289,7 +296,7 @@ async function fetchAvailableRooms() {
               ? "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0;"
               : "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0; opacity: 0.5; cursor: not-allowed;");
 
-        const btnText = isMember ? "Rejoin" : (canJoin ? "Join" : "Terkunci");
+        const btnText = isMember ? "Rejoin" : (canJoin ? "Join" : "Locked");
 
         return `
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 0.9rem; gap: 10px;">
@@ -298,7 +305,7 @@ async function fetchAvailableRooms() {
                 <strong style="color: var(--green-dark); font-size: 0.95rem;">${escapeHtml(room.code)}</strong>
                 <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: white; background: ${badgeColor}; text-transform: uppercase;">${phaseLabel}</span>
               </div>
-              <span style="color: var(--muted); font-size: 0.78rem; margin-top: 2px;">Pemain: ${count}</span>
+              <span style="color: var(--muted); font-size: 0.78rem; margin-top: 2px;">Players: ${count}</span>
             </div>
             <button class="secondary-button" style="${btnStyle}" ${canJoin ? `onclick="joinRoomByCode('${escapeHtml(room.code)}')"` : "disabled"}>${btnText}</button>
           </div>
@@ -306,15 +313,21 @@ async function fetchAvailableRooms() {
       })
       .join("");
   } catch (err) {
-    console.error("Gagal mengambil daftar room:", err);
-    listContainer.innerHTML = `<p style="color: var(--coral); font-size: 0.85rem; margin: 0; text-align: center;">Gagal memuat room.</p>`;
+    console.error("Failed to fetch room list:", err);
+    listContainer.innerHTML = `
+      <div class="empty-state" style="border-color: var(--coral); background: rgba(228, 93, 69, 0.04);">
+        <div class="empty-icon">⚠️</div>
+        <div class="empty-title" style="color: var(--coral);">Failed to Load Rooms</div>
+        <div class="empty-desc">Please check your internet connection and try again.</div>
+      </div>
+    `;
   }
 }
 
 window.joinRoomByCode = (code) => {
   const nameInput = document.querySelector("#playerName");
   if (!nameInput.value.trim()) {
-    setLobbyStatus("Tulis nama kamu dulu sebelum join room!");
+    setLobbyStatus("Please enter your name before joining a room!");
     nameInput.focus();
     return;
   }
@@ -342,7 +355,7 @@ function initSupabase() {
       supabaseClient = window.supabase.createClient(url, key);
       return true;
     } catch (e) {
-      console.error("Gagal inisialisasi Supabase client:", e);
+      console.error("Failed to initialize Supabase client:", e);
     }
   }
   return false;
@@ -351,7 +364,7 @@ function initSupabase() {
 function checkSupabaseConfigured() {
   if (!supabaseClient) {
     if (!initSupabase()) {
-      setLobbyStatus("Koneksi online dinonaktifkan (kredensial Supabase kosong di script.js).");
+      setLobbyStatus("Online connection disabled (empty Supabase credentials in script.js).");
       return false;
     }
   }
@@ -529,6 +542,8 @@ async function resetOnlineRoom() {
   roomCodeDisplay.classList.add("hidden");
   playerList.classList.add("hidden");
   setupRoomInfo.classList.add("hidden");
+  const isClientInOnline = state.mode === "online" && state.online.role !== "host";
+  startButton.classList.toggle("hidden", isClientInOnline);
   startButton.disabled = state.mode === "online";
 }
 
@@ -558,7 +573,8 @@ async function createRoom() {
     last_winner_id: null
   };
 
-  setLobbyStatus("Membuat room...");
+  setLobbyStatus("Creating room...");
+  startButton.classList.remove("hidden");
   startButton.disabled = true;
 
   try {
@@ -582,17 +598,20 @@ async function createRoom() {
 
     state.online.room = convertDbRoomToStateRoom(roomData, [player]);
     setMode("online");
-    roomCodeDisplay.textContent = `Kode room: ${code}`;
+    roomCodeDisplay.textContent = `Room code: ${code}`;
     roomCodeDisplay.classList.remove("hidden");
+    startButton.classList.remove("hidden");
     startButton.disabled = false;
-    setLobbyStatus("Bagikan kode room ke temanmu.");
+    setLobbyStatus("");
 
     subscribeToRoom(code);
     await fetchAndSyncRoom(code);
     showSetup();
   } catch (err) {
     console.error("Error creating room:", err);
-    setLobbyStatus("Room gagal dibuat: " + err.message);
+    setLobbyStatus("Failed to create room: " + err.message);
+    const isClientInOnline = state.mode === "online" && state.online.role !== "host";
+    startButton.classList.toggle("hidden", isClientInOnline);
     startButton.disabled = true;
   }
 }
@@ -604,14 +623,15 @@ async function joinRoom() {
 
   const code = roomCodeInput.value.trim().toUpperCase();
   if (!code) {
-    setLobbyStatus("Masukkan kode room dulu.");
+    setLobbyStatus("Please enter a room code first.");
     return;
   }
 
   await resetOnlineRoom();
   setMode("online");
+  startButton.classList.add("hidden");
   startButton.disabled = true;
-  setLobbyStatus("Menghubungkan ke room...");
+  setLobbyStatus("Connecting to room...");
 
   try {
     const { data: rooms, error: roomError } = await supabaseClient
@@ -621,8 +641,10 @@ async function joinRoom() {
 
     if (roomError) throw roomError;
     if (!rooms || rooms.length === 0) {
-      setLobbyStatus("Room tidak ditemukan. Periksa kode room.");
-      startButton.disabled = false;
+      setLobbyStatus("Room not found. Please check the room code.");
+      const isClientInOnline = state.mode === "online" && state.online.role !== "host";
+      startButton.classList.toggle("hidden", isClientInOnline);
+      startButton.disabled = isClientInOnline;
       return;
     }
 
@@ -638,9 +660,11 @@ async function joinRoom() {
     const isRejoining = (playersInRoom || []).some(p => p.id === state.playerId);
 
     if (room.phase !== "lobby" && !isRejoining) {
-      const phaseLabel = room.phase === "playing" ? "sedang bermain" : "sedang setup";
-      setLobbyStatus(`Room ${phaseLabel}. Kamu hanya bisa join saat room masih lobby.`);
-      startButton.disabled = false;
+      const phaseLabel = room.phase === "playing" ? "playing" : "setting up";
+      setLobbyStatus(`Room is ${phaseLabel}. You can only join when the room is in the lobby.`);
+      const isClientInOnline = state.mode === "online" && state.online.role !== "host";
+      startButton.classList.toggle("hidden", isClientInOnline);
+      startButton.disabled = isClientInOnline;
       return;
     }
 
@@ -669,7 +693,7 @@ async function joinRoom() {
           .in("id", inactiveIds)
           .eq("room_code", code);
       } catch (delErr) {
-        console.warn("Gagal membersihkan pemain tidak aktif saat join:", delErr);
+        console.warn("Failed to clean up inactive players on join:", delErr);
       }
     }
 
@@ -704,20 +728,20 @@ async function joinRoom() {
 
     if (playerError) throw playerError;
 
-    roomCodeDisplay.textContent = `Kode room: ${code}`;
+    roomCodeDisplay.textContent = `Room code: ${code}`;
     roomCodeDisplay.classList.remove("hidden");
 
     if (state.online.role === "host") {
-      setLobbyStatus("Terhubung sebagai Host. Bagikan kode ke temanmu.");
+      setLobbyStatus("Connected as Host.");
     } else {
-      setLobbyStatus("Terhubung. Tunggu host mulai game.");
+      setLobbyStatus("Connected. Waiting for host to start the game.");
     }
 
     subscribeToRoom(code);
     await fetchAndSyncRoom(code);
   } catch (err) {
     console.error("Error joining room:", err);
-    setLobbyStatus("Gagal join room: " + err.message);
+    setLobbyStatus("Failed to join room: " + err.message);
   }
 }
 
@@ -763,22 +787,22 @@ function sendToHost(message) {
 async function submitOnlineCall(number) {
   const room = state.online.room;
   if (!room || room.phase !== "playing") {
-    setStatus("Tunggu semua pemain siap.");
+    setStatus("Wait for all players to be ready.");
     return;
   }
 
   if (!isMyTurn()) {
-    setStatus(`Sekarang giliran ${getCurrentPlayerName()}.`);
+    setStatus(`It's now ${getCurrentPlayerName()}'s turn.`);
     return;
   }
 
   const num = Number(number);
   if (room.calledNumbers.includes(num)) {
-    setStatus(`#${num} sudah pernah dipilih.`);
+    setStatus(`#${num} has already been chosen.`);
     return;
   }
 
-  setStatus(`Memilih #${num}...`);
+  setStatus(`Selecting #${num}...`);
 
   try {
     const updatedCalledNumbers = [...room.calledNumbers, num];
@@ -802,7 +826,7 @@ async function submitOnlineCall(number) {
     if (error) throw error;
   } catch (err) {
     console.error("Error submitting call:", err);
-    setStatus("Gagal memilih angka. Coba lagi.");
+    setStatus("Failed to select number. Try again.");
   }
 }
 
@@ -818,7 +842,9 @@ function applyRoomState(room) {
   }
 
   if (!state.gameStarted) {
-    startButton.disabled = state.mode === "online" && state.online.role !== "host";
+    const isClientInOnline = state.mode === "online" && state.online.role !== "host";
+    startButton.classList.toggle("hidden", isClientInOnline);
+    startButton.disabled = isClientInOnline;
   }
 
   if (room.phase === "lobby") {
@@ -851,19 +877,19 @@ function applyRoomState(room) {
   updateNumpadState();
 
   if (room.phase === "lobby") {
-    setLobbyStatus(state.online.role === "host" ? "Bagikan kode room ke temanmu." : "Terhubung. Tunggu host mulai game.");
+    setLobbyStatus(state.online.role === "host" ? "Connected as Host." : "Connected. Waiting for host to start the game.");
   }
 
   if (room.phase === "setup") {
-    setStatus("Isi board sampai penuh, lalu tekan Siap main.");
+    setStatus("Fill the board completely, then press READY!.");
   }
 
   if (room.phase === "playing") {
     const lastCall = room.lastCall;
     if (lastCall && (!previousCall || previousCall.id !== lastCall.id)) {
-      setStatus(`${lastCall.playerName} memilih #${lastCall.number}. Sekarang giliran ${getCurrentPlayerName()}.`);
+      setStatus(`${lastCall.playerName} selected #${lastCall.number}. It's now ${getCurrentPlayerName()}'s turn.`);
     } else {
-      setStatus(`Sekarang giliran ${getCurrentPlayerName()}.`);
+      setStatus(`It's now ${getCurrentPlayerName()}'s turn.`);
     }
   }
 }
@@ -891,7 +917,12 @@ function renderOnlinePlayers() {
   const room = state.online.room;
   const players = room?.players || [];
   const html = players
-    .map((player) => `<span class="player-chip${player.ready ? " ready" : ""}">${escapeHtml(player.name)}${player.ready ? " siap" : ""}</span>`)
+    .map((player) => {
+      const isHost = room && player.id === room.hostId;
+      const icon = isHost ? "👑" : "👤";
+      const badgeClass = `player-chip${player.ready ? " ready" : ""}${isHost ? " host" : ""}`;
+      return `<span class="${badgeClass}"><span class="chip-icon">${icon}</span><span class="chip-text">${escapeHtml(player.name)}${player.ready ? " ready" : ""}</span></span>`;
+    })
     .join("");
 
   playerList.innerHTML = html;
@@ -915,21 +946,19 @@ function updateSetupRoomInfo() {
 function updateSetupControls() {
   const sizeLocked = state.mode === "online" && state.online.role === "client";
   boardSize.disabled = sizeLocked;
-  decreaseSize.disabled = sizeLocked;
-  increaseSize.disabled = sizeLocked;
 }
 
 function updateOnlinePanel() {
   const room = state.online.room;
   onlinePanel.classList.toggle("hidden", state.mode !== "online" || !state.gameStarted);
   readyButton.classList.toggle("hidden", state.mode !== "online" || !state.gameStarted || room?.phase !== "setup");
+  newGameButton.classList.toggle("hidden", state.mode === "online" && state.online.role !== "host");
 
   if (!room) {
     return;
   }
 
   gameRoomCode.textContent = room.code;
-  turnPlayer.textContent = room.phase === "playing" ? getCurrentPlayerName() : "Menunggu board penuh";
 }
 
 function getCurrentPlayer() {
@@ -942,7 +971,7 @@ function getCurrentPlayer() {
 }
 
 function getCurrentPlayerName() {
-  return getCurrentPlayer()?.name || "pemain";
+  return getCurrentPlayer()?.name || "player";
 }
 
 function isMyTurn() {
@@ -984,13 +1013,13 @@ async function maybeStartTurns() {
 
 async function handleOnlineReady() {
   if (!isBoardFull()) {
-    setStatus("Board harus penuh dulu sebelum siap main.");
+    setStatus("Board must be full before pressing READY!.");
     return;
   }
 
   state.online.ready = true;
   readyButton.disabled = true;
-  readyButton.textContent = "Sudah siap";
+  readyButton.textContent = "READY";
 
   if (state.mode === "online" && supabaseClient && state.online.room) {
     try {
@@ -1001,16 +1030,16 @@ async function handleOnlineReady() {
         .eq("room_code", state.online.room.code);
 
       if (error) throw error;
-      setStatus("Kamu sudah siap. Menunggu pemain lain.");
+      setStatus("You are ready. Waiting for other players.");
 
       if (state.online.role === "host") {
         await maybeStartTurns();
       }
     } catch (err) {
       console.error("Error setting ready status:", err);
-      setStatus("Gagal mengirim status siap.");
+      setStatus("Failed to send ready status.");
       readyButton.disabled = false;
-      readyButton.textContent = "Siap main";
+      readyButton.textContent = "READY!";
     }
   }
 }
@@ -1018,7 +1047,7 @@ async function handleOnlineReady() {
 async function startOnlineGame() {
   const room = state.online.room;
   if (state.online.role !== "host" || !room) {
-    setLobbyStatus("Tunggu host mulai game.");
+    setLobbyStatus("Waiting for host to start the game.");
     return;
   }
 
@@ -1046,7 +1075,7 @@ async function startOnlineGame() {
     state.localWinnerAnnounced = false;
   } catch (err) {
     console.error("Error starting online game:", err);
-    setLobbyStatus("Gagal memulai game: " + err.message);
+    setLobbyStatus("Failed to start game: " + err.message);
   }
 }
 
@@ -1066,7 +1095,7 @@ async function announceWinner() {
         .update({
           winner: {
             id: player.id,
-            name: player.name || "Pemain"
+            name: player.name || "Player"
           },
           last_winner_id: player.id
         })
@@ -1093,7 +1122,7 @@ function showWinner(name) {
 
   state.winnerShown = true;
   winnerTitle.textContent = "Bingo!";
-  winnerMessage.textContent = `${name} menang!`;
+  winnerMessage.textContent = `${name} wins!`;
   winnerModal.classList.remove("hidden");
   closeWinnerButton.focus();
 }
@@ -1215,7 +1244,7 @@ function restoreLocalBoardState(roomCode) {
       return true;
     }
   } catch (e) {
-    console.error("Gagal restore board dari localStorage:", e);
+    console.error("Failed to restore board from localStorage:", e);
   }
   return false;
 }
@@ -1264,13 +1293,13 @@ function beginGame(mode = state.mode) {
   fillRandomButton.classList.remove("hidden");
   clearBoardButton.classList.remove("hidden");
   readyButton.disabled = false;
-  readyButton.textContent = "Siap main";
+  readyButton.textContent = "READY!";
   updateOnlinePanel();
   renderBingoLetters();
   renderBoard();
   updateBingo();
   updateNumpadState();
-  setStatus(mode === "online" ? "Isi semua kolom board, lalu tekan Siap main." : "Pilih kolom lalu isi angka, atau tekan Isi random.");
+  setStatus(mode === "online" ? "Fill all cells on the board, then press READY!." : "Select a cell and input a number, or press Fill random.");
 }
 
 function renderBoard() {
@@ -1284,7 +1313,7 @@ function renderBoard() {
     button.type = "button";
     button.className = "cell-button";
     button.textContent = value || "+";
-    button.setAttribute("aria-label", `Kolom ${index + 1}${value ? ` bernilai ${value}` : " kosong"}`);
+    button.setAttribute("aria-label", `Cell ${index + 1}${value ? ` has value ${value}` : " empty"}`);
     button.classList.toggle("empty", !value);
     button.classList.toggle("marked", state.marked.has(index));
     button.classList.toggle("selected", state.selectedIndex === index);
@@ -1315,7 +1344,7 @@ function renderBingoLetters() {
 
 async function handleCellClick(index) {
   if (state.mode === "online" && state.online.ready && state.online.room?.phase === "setup") {
-    setStatus("Kamu sudah siap. Menunggu pemain lain.");
+    setStatus("You are ready. Waiting for other players.");
     return;
   }
 
@@ -1330,12 +1359,12 @@ async function handleCellClick(index) {
   if (state.mode === "online") {
     const room = state.online.room;
     if (room?.phase !== "playing") {
-      setStatus("Tunggu semua pemain siap.");
+      setStatus("Wait for all players to be ready.");
       return;
     }
 
     if (!isMyTurn()) {
-      setStatus(`Sekarang giliran ${getCurrentPlayerName()}.`);
+      setStatus(`It's now ${getCurrentPlayerName()}'s turn.`);
       return;
     }
 
@@ -1344,12 +1373,12 @@ async function handleCellClick(index) {
   }
 
   if (!state.cells[index]) {
-    setStatus("Kolom ini masih kosong. Isi random dulu atau pindah ke mode isi sendiri.");
+    setStatus("This cell is empty. Fill random first or switch to manual input mode.");
     return;
   }
 
   if (state.marked.has(index)) {
-    const shouldRemove = await showConfirm(`${state.cells[index]} sudah dipilih, hapus?`);
+    const shouldRemove = await showConfirm(`${state.cells[index]} is already selected. Remove it?`);
     if (!shouldRemove) {
       return;
     }
@@ -1367,7 +1396,7 @@ async function handleCellClick(index) {
 
 function fillRandom() {
   if (state.mode === "online" && state.online.ready && state.online.room?.phase === "setup") {
-    setStatus("Kamu sudah siap. Menunggu pemain lain.");
+    setStatus("You are ready. Waiting for other players.");
     return;
   }
 
@@ -1383,12 +1412,12 @@ function fillRandom() {
   updateBingo();
   updateNumpadState();
   saveLocalBoardState();
-  setStatus("Board sudah terisi random. Ketik angka lalu OK, atau tap angka untuk menandai.");
+  setStatus("Board filled randomly. Type a number and press OK, or tap a cell to mark it.");
 }
 
 function clearBoard() {
   if (state.mode === "online" && state.online.ready && state.online.room?.phase === "setup") {
-    setStatus("Kamu sudah siap. Menunggu pemain lain.");
+    setStatus("You are ready. Waiting for other players.");
     return;
   }
 
@@ -1401,7 +1430,7 @@ function clearBoard() {
   updateBingo();
   updateNumpadState();
   saveLocalBoardState();
-  setStatus("Board dikosongkan. Pilih mode random atau isi sendiri.");
+  setStatus("Board cleared. Choose random mode or fill it manually.");
 }
 
 function shuffle(items) {
@@ -1413,7 +1442,7 @@ function shuffle(items) {
 
 function addDigit(digit) {
   if (!isBoardFull() && state.selectedIndex === null) {
-    setStatus("Pilih kolom dulu sebelum input angka.");
+    setStatus("Select a cell first before entering a number.");
     return;
   }
 
@@ -1424,24 +1453,24 @@ function addDigit(digit) {
 
 function applyNumber() {
   if (state.mode === "online" && state.online.ready && state.online.room?.phase === "setup") {
-    setStatus("Kamu sudah siap. Menunggu pemain lain.");
+    setStatus("You are ready. Waiting for other players.");
     return;
   }
 
   if (isBoardFull()) {
     if (state.mode === "online") {
       if (state.online.room?.phase !== "playing") {
-        setStatus("Tunggu semua pemain siap.");
+        setStatus("Wait for all players to be ready.");
         return;
       }
 
       if (!isMyTurn()) {
-        setStatus(`Sekarang giliran ${getCurrentPlayerName()}.`);
+        setStatus(`It's now ${getCurrentPlayerName()}'s turn.`);
         return;
       }
 
       if (!state.entry) {
-        setStatus("Masukkan angka yang mau dipilih.");
+        setStatus("Enter the number you want to choose.");
         return;
       }
 
@@ -1456,12 +1485,12 @@ function applyNumber() {
   }
 
   if (state.selectedIndex === null) {
-    setStatus("Pilih kolom dulu sebelum menyimpan angka.");
+    setStatus("Select a cell first before saving the number.");
     return;
   }
 
   if (!state.entry) {
-    setStatus("Masukkan angka dulu.");
+    setStatus("Please enter a number first.");
     return;
   }
 
@@ -1476,15 +1505,15 @@ function applyNumber() {
   updateNumpadState();
   saveLocalBoardState();
   if (nextIndex === null) {
-    setStatus(state.mode === "online" ? "Board penuh. Tekan Siap main." : "Semua kolom sudah terisi. Tap angka untuk menandai.");
+    setStatus(state.mode === "online" ? "Board full. Press READY!." : "All cells are filled. Tap a number to mark it.");
   } else {
-    setStatus("Angka tersimpan. Lanjut isi kolom berikutnya.");
+    setStatus("Number saved. Continue filling the next cell.");
   }
 }
 
 async function applySearch() {
   if (!state.entry) {
-    setStatus("Masukkan angka yang mau dicari.");
+    setStatus("Enter the number you want to search.");
     return;
   }
 
@@ -1495,7 +1524,7 @@ async function applySearch() {
   if (foundIndex === -1) {
     state.selectedIndex = null;
     renderBoard();
-    setStatus(`Angka ${number} tidak ada di board.`);
+    setStatus(`Number ${number} is not on the board.`);
     return;
   }
 
@@ -1503,15 +1532,15 @@ async function applySearch() {
 
   if (state.marked.has(foundIndex)) {
     renderBoard();
-    const shouldRemove = await showConfirm(`${number} sudah dipilih, hapus?`);
+    const shouldRemove = await showConfirm(`${number} is already selected. Remove it?`);
     if (shouldRemove) {
       state.marked.delete(foundIndex);
       state.completedLines = findCompletedLines();
       renderBoard();
       updateBingo();
-      setStatus(`Angka ${number} sudah dihapus dari pilihan.`);
+      setStatus(`Number ${number} has been removed from selection.`);
     } else {
-      setStatus(`Angka ${number} tetap dipilih.`);
+      setStatus(`Number ${number} remains selected.`);
     }
     return;
   }
@@ -1520,7 +1549,7 @@ async function applySearch() {
   state.completedLines = findCompletedLines();
   renderBoard();
   updateBingo();
-  setStatus(`Angka ${number} dipilih.`);
+  setStatus(`Number ${number} selected.`);
 }
 
 function findNextEmptyIndex(startAt) {
@@ -1536,18 +1565,18 @@ function findNextEmptyIndex(startAt) {
 
 function updateSelectedCell() {
   if (isBoardFull()) {
-    selectedCell.textContent = "Cari angka";
+    selectedCell.textContent = "Search number";
     entryDisplay.textContent = state.entry || "0";
     return;
   }
 
   if (state.selectedIndex === null) {
-    selectedCell.textContent = "Pilih kolom";
+    selectedCell.textContent = "Select cell";
     entryDisplay.textContent = "0";
     return;
   }
 
-  selectedCell.textContent = `Kolom ${state.selectedIndex + 1}`;
+  selectedCell.textContent = `Cell ${state.selectedIndex + 1}`;
   entryDisplay.textContent = state.entry || "0";
 }
 
@@ -1599,7 +1628,7 @@ function updateBingo() {
 
   if (completedCount > 0) {
     const word = target.slice(0, completedCount).join("");
-    setStatus(completedCount === target.length ? `${word} lengkap!` : `${word} muncul. Lengkapi garis berikutnya.`);
+    setStatus(completedCount === target.length ? `${word} complete!` : `${word} formed. Complete the next line.`);
   }
 
   if (completedCount === target.length) {
@@ -1612,10 +1641,10 @@ function setStatus(message) {
 }
 
 function showConfirm(message, options = {}) {
-  confirmTitle.textContent = options.title || "Angka sudah dipilih";
+  confirmTitle.textContent = options.title || "Number already selected";
   confirmMessage.textContent = message;
-  acceptConfirmButton.textContent = options.acceptLabel || "Hapus";
-  cancelConfirmButton.textContent = options.cancelLabel || "Batal";
+  acceptConfirmButton.textContent = options.acceptLabel || "Remove";
+  cancelConfirmButton.textContent = options.cancelLabel || "Cancel";
   confirmModal.classList.remove("hidden");
   acceptConfirmButton.focus();
 
@@ -1647,10 +1676,10 @@ async function handleHistoryBack() {
   }
 
   state.historyGuardActive = false;
-  const shouldLeave = await showConfirm("Permainan akan diulang kalau kamu keluar dari halaman ini.", {
-    title: "Keluar dari permainan?",
-    acceptLabel: "Keluar",
-    cancelLabel: "Tetap main",
+  const shouldLeave = await showConfirm("The game will be reset if you leave this page.", {
+    title: "Leave the game?",
+    acceptLabel: "Leave",
+    cancelLabel: "Keep playing",
   });
 
   if (shouldLeave) {
@@ -1671,7 +1700,7 @@ function updateNumpadState() {
   const lockedForTurn = state.mode === "online" && state.online.room?.phase === "playing" && !isMyTurn();
   numpadPanel.classList.toggle("disabled", lockedForReady || lockedForTurn);
   if (isBoardFull()) {
-    selectedCell.textContent = "Cari angka";
+    selectedCell.textContent = "Search number";
   }
 }
 
@@ -1686,8 +1715,6 @@ function getCellFontSize() {
   return largest - (largest - smallest) * progress;
 }
 
-decreaseSize.addEventListener("click", () => setSize(Number(boardSize.value) - 1));
-increaseSize.addEventListener("click", () => setSize(Number(boardSize.value) + 1));
 boardSize.addEventListener("change", () => setSize(boardSize.value));
 offlineButton.addEventListener("click", () => {
   resetOnlineRoom();
@@ -1725,7 +1752,7 @@ newGameButton.addEventListener("click", async () => {
   const mode = state.mode;
   if (mode === "online") {
     if (state.online.role !== "host") {
-      setStatus("Tunggu host mulai game baru.");
+      setStatus("Waiting for host to start a new game.");
       return;
     }
 
@@ -1751,7 +1778,7 @@ newGameButton.addEventListener("click", async () => {
         leaveGameForSetup();
       } catch (err) {
         console.error("Error resetting room:", err);
-        setStatus("Gagal membuat game baru.");
+        setStatus("Failed to create a new game.");
       }
     }
     return;
@@ -1805,10 +1832,10 @@ window.addEventListener("popstate", handleHistoryBack);
 async function exitToLobby() {
   let shouldExit = true;
   if (state.gameStarted) {
-    shouldExit = await showConfirm("Apakah kamu yakin ingin keluar dari room dan kembali ke lobby?", {
-      title: "Keluar Room?",
-      acceptLabel: "Keluar",
-      cancelLabel: "Batal"
+    shouldExit = await showConfirm("Are you sure you want to leave the room and return to the lobby?", {
+      title: "Exit Room?",
+      acceptLabel: "Leave",
+      cancelLabel: "Cancel"
     });
   }
 

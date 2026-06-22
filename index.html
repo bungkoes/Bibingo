@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -18,44 +18,47 @@
 
         <div class="setup-panel">
           <div class="global-player-setup">
-            <label for="playerName">Nama pemain</label>
-            <input id="playerName" type="text" maxlength="18" placeholder="Tulis nama kamu" autocomplete="nickname" />
+            <label for="playerName">Player Name</label>
+            <input id="playerName" type="text" maxlength="18" placeholder="Enter your name" autocomplete="nickname" />
           </div>
 
           <div class="lobby-tabs">
-            <button class="tab-button active" id="tabCreateBtn" type="button">Buat Room</button>
-            <button class="tab-button" id="tabJoinBtn" type="button">Gabung Room</button>
+            <button class="tab-button active" id="tabCreateBtn" type="button">Create Room</button>
+            <button class="tab-button" id="tabJoinBtn" type="button">Join Room</button>
           </div>
 
           <div class="tab-content" id="contentCreateRoom">
             <div class="card-action">
-              <p class="tab-description">Buat room game online baru dan undang teman untuk bermain bersama.</p>
+              <p class="tab-description">Create a new online game room and invite friends to play together.</p>
               <button class="primary-button" id="createRoomButton" type="button">Create room</button>
             </div>
           </div>
 
           <div class="tab-content hidden" id="contentJoinRoom">
             <div class="card-action">
-              <p class="tab-description">Masukkan kode room yang dibagikan oleh temanmu untuk masuk ke dalam permainan.</p>
+              <p class="tab-description">Enter the room code shared by your friend to join the game.</p>
               <div class="join-row">
-                <input id="roomCodeInput" type="text" maxlength="24" placeholder="Kode room" autocomplete="off" />
+                <input id="roomCodeInput" type="text" maxlength="24" placeholder="Room code" autocomplete="off" />
                 <button class="primary-button" id="joinRoomButton" type="button">Join room</button>
               </div>
             </div>
           </div>
 
           <p class="room-code hidden" id="roomCodeDisplay"></p>
-          <p class="lobby-status" id="lobbyStatus">Masukkan nama, lalu create atau join room.</p>
-          <div class="player-list hidden" id="playerList" aria-label="Daftar pemain"></div>
+          <p class="lobby-status" id="lobbyStatus"></p>
+          <div class="player-list hidden" id="playerList" aria-label="Player list"></div>
 
           <div class="offline-divider">
-            <button class="outline-button full-button" id="offlineButton" type="button">Main offline</button>
+            <button class="outline-button full-button" id="offlineButton" type="button">Play offline</button>
           </div>
 
           <fieldset class="available-rooms">
-            <legend>Room Tersedia</legend>
+            <legend>Available Rooms</legend>
             <div id="availableRoomsList">
-              <p style="color: var(--muted); font-size: 0.85rem; font-style: italic; margin: 0; text-align: center;">Memuat daftar room...</p>
+              <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading available rooms...</p>
+              </div>
             </div>
           </fieldset>
         </div>
@@ -71,17 +74,19 @@
 
         <div class="setup-panel">
           <div class="setup-room-info hidden" id="setupRoomInfo">
-            <span class="panel-label">Room</span>
-            <strong id="setupRoomCode">-</strong>
-            <div class="online-players" id="setupPlayers"></div>
+            <div class="setup-room-code-col">
+              <span class="panel-label">Room</span>
+              <strong id="setupRoomCode">-</strong>
+            </div>
+            <div class="setup-room-players-col">
+              <span class="panel-label">Players:</span>
+              <div class="online-players" id="setupPlayers"></div>
+            </div>
           </div>
 
-          <label for="boardSize">Ukuran board</label>
+          <label for="boardSize">Board size</label>
           <div class="size-control">
-            <button class="icon-button" id="decreaseSize" type="button" aria-label="Kurangi ukuran">
-              -
-            </button>
-            <select id="boardSize" aria-describedby="sizeHint">
+            <select id="boardSize">
               <option value="5">5 x 5</option>
               <option value="6">6 x 6</option>
               <option value="7">7 x 7</option>
@@ -91,21 +96,17 @@
               <option value="11">11 x 11</option>
               <option value="12">12 x 12</option>
             </select>
-            <button class="icon-button" id="increaseSize" type="button" aria-label="Tambah ukuran">
-              +
-            </button>
           </div>
-          <p id="sizeHint">Pilih dari 5 x 5 sampai 12 x 12.</p>
 
           <fieldset class="theme-picker">
-            <legend>Tema warna</legend>
+            <legend>Color theme</legend>
             <div class="color-picker">
               <div
                 class="color-wheel"
                 id="colorWheel"
                 role="slider"
                 tabindex="0"
-                aria-label="Pilih warna tema"
+                aria-label="Select theme color"
                 aria-valuemin="0"
                 aria-valuemax="360"
                 aria-valuenow="156"
@@ -113,15 +114,15 @@
                 <span class="color-marker" id="colorMarker" aria-hidden="true"></span>
               </div>
               <label class="brightness-control" for="brightnessSlider">
-                <span>Gelap</span>
+                <span>Dark</span>
                 <input id="brightnessSlider" type="range" min="30" max="65" value="45" />
-                <span>Terang</span>
+                <span>Light</span>
               </label>
             </div>
           </fieldset>
 
           <button class="primary-button" id="startButton" type="button">Start game</button>
-          <button class="ghost-button full-button" id="backToLobbyFromSetupButton" type="button" style="margin-top: 10px;">Kembali ke Lobby</button>
+          <button class="ghost-button full-button" id="backToLobbyFromSetupButton" type="button" style="margin-top: 10px;">Back to Lobby</button>
         </div>
       </section>
 
@@ -132,42 +133,41 @@
             <h2 id="gameTitle">Board <span id="currentSize">5 x 5</span></h2>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <button class="ghost-button" id="exitToLobbyButton" type="button">Keluar Room</button>
-            <button class="ghost-button" id="newGameButton" type="button">Game baru</button>
+            <button class="ghost-button" id="exitToLobbyButton" type="button">Exit Room</button>
+            <button class="ghost-button" id="newGameButton" type="button">New game</button>
           </div>
         </header>
 
-        <section class="game-toolbar" aria-label="Aksi board">
-          <button class="secondary-button" id="fillRandomButton" type="button">Isi random</button>
-          <button class="secondary-button" id="clearBoardButton" type="button">Kosongkan</button>
-          <button class="secondary-button hidden" id="readyButton" type="button">Siap main</button>
+        <section class="game-toolbar" aria-label="Board actions">
+          <button class="secondary-button" id="fillRandomButton" type="button">Fill random</button>
+          <button class="secondary-button" id="clearBoardButton" type="button">Clear</button>
+          <button class="secondary-button hidden" id="readyButton" type="button">READY!</button>
         </section>
 
-        <section class="online-panel hidden" id="onlinePanel" aria-label="Info online">
-          <div>
+        <section class="online-panel hidden" id="onlinePanel" aria-label="Online info">
+          <div class="setup-room-code-col">
             <span class="panel-label">Room</span>
-            <strong id="gameRoomCode">-</strong>
+            <span id="gameRoomCode">-</span>
           </div>
-          <div>
-            <span class="panel-label">Giliran</span>
-            <strong id="turnPlayer">Menunggu pemain</strong>
+          <div class="setup-room-players-col">
+            <span class="panel-label">Players:</span>
+            <div class="online-players" id="gamePlayers"></div>
           </div>
-          <div class="online-players" id="gamePlayers"></div>
         </section>
 
-        <section class="bingo-word" id="bingoWord" aria-label="Progress bingo"></section>
+        <section class="bingo-word" id="bingoWord" aria-label="Bingo progress"></section>
 
-        <p class="status-line" id="statusLine">Isi board secara random atau pilih kolom untuk isi sendiri.</p>
+        <p class="status-line" id="statusLine">Fill the board randomly or select a cell to enter values manually.</p>
 
         <section class="play-area">
           <div class="board-wrap">
-            <div class="board-grid" id="boardGrid" aria-label="Board bingo"></div>
+            <div class="board-grid" id="boardGrid" aria-label="Bingo board"></div>
           </div>
 
           <aside class="numpad-panel" id="numpadPanel" aria-label="Numpad">
-            <div class="selected-cell" id="selectedCell">Pilih kolom</div>
+            <div class="selected-cell" id="selectedCell">Select cell</div>
             <div class="entry-display" id="entryDisplay">0</div>
-            <div class="numpad" aria-label="Input angka">
+            <div class="numpad" aria-label="Number input">
               <button type="button" data-number="1">1</button>
               <button type="button" data-number="2">2</button>
               <button type="button" data-number="3">3</button>
@@ -189,11 +189,11 @@
     <div class="modal-overlay hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <div class="confirm-card">
         <div class="confirm-icon">!</div>
-        <h3 id="confirmTitle">Angka sudah dipilih</h3>
-        <p id="confirmMessage">Hapus angka ini dari pilihan?</p>
+        <h3 id="confirmTitle">Number already chosen</h3>
+        <p id="confirmMessage">Remove this number from selection?</p>
         <div class="confirm-actions">
-          <button class="ghost-button" id="cancelConfirmButton" type="button">Batal</button>
-          <button class="danger-button" id="acceptConfirmButton" type="button">Hapus</button>
+          <button class="ghost-button" id="cancelConfirmButton" type="button">Cancel</button>
+          <button class="danger-button" id="acceptConfirmButton" type="button">Remove</button>
         </div>
       </div>
     </div>
@@ -202,7 +202,7 @@
       <div class="confirm-card winner-card">
         <div class="confirm-icon winner-icon">B</div>
         <h3 id="winnerTitle">Bingo!</h3>
-        <p id="winnerMessage">Pemenangnya sudah muncul.</p>
+        <p id="winnerMessage">A winner has emerged.</p>
         <div class="confirm-actions single-action">
           <button class="primary-button" id="closeWinnerButton" type="button">OK</button>
         </div>
