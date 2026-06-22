@@ -277,6 +277,7 @@ async function fetchAvailableRooms() {
         const count = playerCounts[room.code] || 0;
         const phaseLabel = room.phase === "playing" ? "Bermain" : room.phase === "setup" ? "Setup" : "Lobby";
         const badgeColor = room.phase === "playing" ? "var(--coral)" : room.phase === "setup" ? "var(--blue)" : "var(--green-dark)";
+        const canJoin = room.phase === "lobby";
         
         return `
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 0.9rem; gap: 10px;">
@@ -287,7 +288,7 @@ async function fetchAvailableRooms() {
               </div>
               <span style="color: var(--muted); font-size: 0.78rem; margin-top: 2px;">Pemain: ${count}</span>
             </div>
-            <button class="secondary-button" style="min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0;" onclick="joinRoomByCode('${escapeHtml(room.code)}')">Join</button>
+            <button class="secondary-button" style="min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0;" ${canJoin ? `onclick="joinRoomByCode('${escapeHtml(room.code)}')"` : "disabled"}>${canJoin ? "Join" : "Terkunci"}</button>
           </div>
         `;
       })
@@ -374,7 +375,50 @@ async function fetchAndSyncRoom(roomCode) {
 
     if (playersError) throw playersError;
 
-    const syncedRoom = convertDbRoomToStateRoom(dbRoom, dbPlayers);
+    const now = new Date();
+    const activeDbPlayers = (dbPlayers || []).filter(p => {
+      const lastActive = new Date(p.last_active_at);
+      return (now - lastActive) < 30000;
+    });
+
+    const inactiveDbPlayers = (dbPlayers || []).filter(p => {
+      const lastActive = new Date(p.last_active_at);
+      return (now - lastActive) >= 30000;
+    });
+
+    const isFirstActivePlayer = activeDbPlayers.length > 0 && activeDbPlayers[0].id === state.playerId;
+
+    if (inactiveDbPlayers.length > 0 && isFirstActivePlayer) {
+      const inactiveIds = inactiveDbPlayers.map(p => p.id);
+      console.log("Cleaning up inactive players in database:", inactiveIds);
+      supabaseClient
+        .from("players")
+        .delete()
+        .in("id", inactiveIds)
+        .eq("room_code", roomCode)
+        .then(({ error }) => {
+          if (error) console.error("Error cleaning up inactive players:", error);
+        });
+    }
+
+    const hostActive = activeDbPlayers.some(p => p.id === dbRoom.host_id);
+
+    if (!hostActive && activeDbPlayers.length > 0) {
+      const newHost = activeDbPlayers[0];
+      if (isFirstActivePlayer) {
+        console.log(`Host ${dbRoom.host_id} is inactive. Electing new host: ${newHost.name} (${newHost.id})`);
+        supabaseClient
+          .from("rooms")
+          .update({ host_id: newHost.id })
+          .eq("code", roomCode)
+          .then(({ error }) => {
+            if (error) console.error("Error electing new host:", error);
+          });
+      }
+      dbRoom.host_id = newHost.id;
+    }
+
+    const syncedRoom = convertDbRoomToStateRoom(dbRoom, activeDbPlayers);
     applyRoomState(syncedRoom);
   } catch (err) {
     console.error("Error fetching room/players:", err);
@@ -543,7 +587,6 @@ async function joinRoom() {
   }
 
   await resetOnlineRoom();
-  state.online.role = "client";
   setMode("online");
   startButton.disabled = true;
   setLobbyStatus("Menghubungkan ke room...");
@@ -561,6 +604,65 @@ async function joinRoom() {
       return;
     }
 
+    const room = rooms[0];
+
+    if (room.phase !== "lobby") {
+      const phaseLabel = room.phase === "playing" ? "sedang bermain" : "sedang setup";
+      setLobbyStatus(`Room ${phaseLabel}. Kamu hanya bisa join saat room masih lobby.`);
+      startButton.disabled = false;
+      return;
+    }
+
+    const { data: playersInRoom, error: playersError } = await supabaseClient
+      .from("players")
+      .select("id, last_active_at")
+      .eq("room_code", code);
+
+    if (playersError) throw playersError;
+
+    const now = new Date();
+    const activePlayers = (playersInRoom || []).filter(p => {
+      if (p.id === state.playerId) return false;
+      const lastActive = new Date(p.last_active_at);
+      return (now - lastActive) < 30000;
+    });
+
+    const inactivePlayers = (playersInRoom || []).filter(p => {
+      const lastActive = new Date(p.last_active_at);
+      return (now - lastActive) >= 30000;
+    });
+
+    if (inactivePlayers.length > 0) {
+      const inactiveIds = inactivePlayers.map(p => p.id);
+      try {
+        await supabaseClient
+          .from("players")
+          .delete()
+          .in("id", inactiveIds)
+          .eq("room_code", code);
+      } catch (delErr) {
+        console.warn("Gagal membersihkan pemain tidak aktif saat join:", delErr);
+      }
+    }
+
+    const isEmpty = activePlayers.length === 0;
+
+    if (isEmpty) {
+      const { error: updateHostError } = await supabaseClient
+        .from("rooms")
+        .update({ host_id: state.playerId })
+        .eq("code", code);
+
+      if (updateHostError) throw updateHostError;
+      state.online.role = "host";
+    } else {
+      if (room.host_id === state.playerId) {
+        state.online.role = "host";
+      } else {
+        state.online.role = "client";
+      }
+    }
+
     const player = getSelfPlayer(false);
     const { error: playerError } = await supabaseClient
       .from("players")
@@ -576,7 +678,12 @@ async function joinRoom() {
 
     roomCodeDisplay.textContent = `Kode room: ${code}`;
     roomCodeDisplay.classList.remove("hidden");
-    setLobbyStatus("Terhubung. Tunggu host mulai game.");
+
+    if (state.online.role === "host") {
+      setLobbyStatus("Terhubung sebagai Host. Bagikan kode ke temanmu.");
+    } else {
+      setLobbyStatus("Terhubung. Tunggu host mulai game.");
+    }
 
     subscribeToRoom(code);
     await fetchAndSyncRoom(code);
@@ -675,6 +782,16 @@ function applyRoomState(room) {
   const previousPhase = state.online.room?.phase;
   const previousCall = state.online.room?.lastCall;
   state.online.room = room;
+
+  if (room.hostId === state.playerId) {
+    state.online.role = "host";
+  } else {
+    state.online.role = "client";
+  }
+
+  if (!state.gameStarted) {
+    startButton.disabled = state.mode === "online" && state.online.role !== "host";
+  }
 
   if (room.phase === "lobby") {
     if (state.gameStarted) {
