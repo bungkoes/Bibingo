@@ -1788,21 +1788,6 @@ window.addEventListener("beforeunload", (event) => {
 });
 window.addEventListener("popstate", handleHistoryBack);
 
-window.addEventListener("pagehide", () => {
-  if (state.mode === "online" && supabaseClient && state.online.room) {
-    const url = `${DEFAULT_SUPABASE_URL}/rest/v1/players?id=eq.${state.playerId}&room_code=eq.${state.online.room.code}`;
-    const headers = {
-      "apikey": DEFAULT_SUPABASE_KEY,
-      "Authorization": `Bearer ${DEFAULT_SUPABASE_KEY}`
-    };
-    fetch(url, {
-      method: "DELETE",
-      headers: headers,
-      keepalive: true
-    });
-  }
-});
-
 async function exitToLobby() {
   let shouldExit = true;
   if (state.gameStarted) {
