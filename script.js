@@ -229,13 +229,17 @@ async function fetchAvailableRooms() {
 
     const { data: dbPlayers, error: playersError } = await supabaseClient
       .from("players")
-      .select("room_code");
+      .select("id, room_code");
 
     if (playersError) throw playersError;
 
     const playerCounts = {};
-    dbPlayers.forEach((player) => {
+    const memberRooms = new Set();
+    (dbPlayers || []).forEach((player) => {
       playerCounts[player.room_code] = (playerCounts[player.room_code] || 0) + 1;
+      if (player.id === state.playerId) {
+        memberRooms.add(player.room_code);
+      }
     });
 
     const now = new Date();
@@ -277,10 +281,15 @@ async function fetchAvailableRooms() {
         const count = playerCounts[room.code] || 0;
         const phaseLabel = room.phase === "playing" ? "Bermain" : room.phase === "setup" ? "Setup" : "Lobby";
         const badgeColor = room.phase === "playing" ? "var(--coral)" : room.phase === "setup" ? "var(--blue)" : "var(--green-dark)";
-        const canJoin = room.phase === "lobby";
-        const btnStyle = canJoin
-          ? "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0;"
-          : "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0; opacity: 0.5; cursor: not-allowed;";
+        const isMember = memberRooms.has(room.code);
+        const canJoin = room.phase === "lobby" || isMember;
+        const btnStyle = isMember
+          ? "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0; background: var(--green); color: white; border-color: var(--green-dark); font-weight: bold;"
+          : (canJoin
+              ? "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0;"
+              : "min-height: auto; height: 32px; padding: 0 12px; font-size: 0.8rem; margin: 0; opacity: 0.5; cursor: not-allowed;");
+
+        const btnText = isMember ? "Rejoin" : (canJoin ? "Join" : "Terkunci");
 
         return `
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 0.9rem; gap: 10px;">
@@ -291,7 +300,7 @@ async function fetchAvailableRooms() {
               </div>
               <span style="color: var(--muted); font-size: 0.78rem; margin-top: 2px;">Pemain: ${count}</span>
             </div>
-            <button class="secondary-button" style="${btnStyle}" ${canJoin ? `onclick="joinRoomByCode('${escapeHtml(room.code)}')"` : "disabled"}>${canJoin ? "Join" : "Terkunci"}</button>
+            <button class="secondary-button" style="${btnStyle}" ${canJoin ? `onclick="joinRoomByCode('${escapeHtml(room.code)}')"` : "disabled"}>${btnText}</button>
           </div>
         `;
       })
