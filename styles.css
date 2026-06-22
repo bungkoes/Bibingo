@@ -848,3 +848,115 @@ input::placeholder {
     gap: 8px;
   }
 }
+
+/* Lobby Redesign Tab & Layout */
+.global-player-setup {
+  margin-bottom: 20px;
+  text-align: left;
+}
+.global-player-setup label {
+  display: block;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+.global-player-setup input {
+  width: 100%;
+}
+.lobby-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tab-button {
+  flex: 1;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink);
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+.tab-button.active {
+  background: var(--green);
+  color: white;
+  border-color: var(--green-dark);
+}
+.tab-content.hidden {
+  display: none !important;
+}
+.card-action {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
+}
+.tab-description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: left;
+  line-height: 1.4;
+}
+.offline-divider {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.outline-button {
+  width: 100%;
+  min-height: 46px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.outline-button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.4);
+}
+.outline-button:active {
+  transform: translateY(1px);
+}
+.available-rooms {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 15px;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  margin-bottom: 0;
+}
+.available-rooms legend {
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0 8px;
+  text-transform: uppercase;
+}
+#availableRoomsList {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 0;
+  margin-top: 6px;
+}
