@@ -1457,6 +1457,27 @@ function applyNumber() {
     return;
   }
 
+  if (state.selectedIndex === null && !isBoardFull()) {
+    setStatus("Select a cell first before saving the number.");
+    return;
+  }
+
+  if (!state.entry) {
+    if (isBoardFull()) {
+      setStatus(state.mode === "online" ? "Enter the number you want to choose." : "Enter the number you want to search.");
+    } else {
+      setStatus("Please enter a number first.");
+    }
+    return;
+  }
+
+  const val = Number(state.entry);
+  const maxVal = state.size * state.size;
+  if (val < 1 || val > maxVal) {
+    setStatus(`Please enter a number between 1 and ${maxVal}.`);
+    return;
+  }
+
   if (isBoardFull()) {
     if (state.mode === "online") {
       if (state.online.room?.phase !== "playing") {
@@ -1469,12 +1490,7 @@ function applyNumber() {
         return;
       }
 
-      if (!state.entry) {
-        setStatus("Enter the number you want to choose.");
-        return;
-      }
-
-      submitOnlineCall(Number(state.entry));
+      submitOnlineCall(val);
       state.entry = "";
       updateSelectedCell();
       return;
@@ -1484,17 +1500,7 @@ function applyNumber() {
     return;
   }
 
-  if (state.selectedIndex === null) {
-    setStatus("Select a cell first before saving the number.");
-    return;
-  }
-
-  if (!state.entry) {
-    setStatus("Please enter a number first.");
-    return;
-  }
-
-  state.cells[state.selectedIndex] = Number(state.entry);
+  state.cells[state.selectedIndex] = val;
   state.marked.delete(state.selectedIndex);
   state.completedLines = findCompletedLines();
   const nextIndex = findNextEmptyIndex(state.selectedIndex + 1);
