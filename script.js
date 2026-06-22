@@ -390,12 +390,12 @@ async function fetchAndSyncRoom(roomCode) {
     const now = new Date();
     const activeDbPlayers = (dbPlayers || []).filter(p => {
       const lastActive = new Date(p.last_active_at);
-      return (now - lastActive) < 30000;
+      return (now - lastActive) < 60000;
     });
 
     const inactiveDbPlayers = (dbPlayers || []).filter(p => {
       const lastActive = new Date(p.last_active_at);
-      return (now - lastActive) >= 30000;
+      return (now - lastActive) >= 60000;
     });
 
     const isFirstActivePlayer = activeDbPlayers.length > 0 && activeDbPlayers[0].id === state.playerId;
@@ -638,12 +638,12 @@ async function joinRoom() {
     const activePlayers = (playersInRoom || []).filter(p => {
       if (p.id === state.playerId) return false;
       const lastActive = new Date(p.last_active_at);
-      return (now - lastActive) < 30000;
+      return (now - lastActive) < 60000;
     });
 
     const inactivePlayers = (playersInRoom || []).filter(p => {
       const lastActive = new Date(p.last_active_at);
-      return (now - lastActive) >= 30000;
+      return (now - lastActive) >= 60000;
     });
 
     if (inactivePlayers.length > 0) {
