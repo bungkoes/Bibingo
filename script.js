@@ -486,13 +486,12 @@ function startPlayerHeartbeat(roomCode) {
 }
 
 async function deleteSelfFromRoom() {
-  if (state.mode === "online" && supabaseClient && state.online.room) {
+  if (state.mode === "online" && supabaseClient) {
     try {
       await supabaseClient
         .from("players")
         .delete()
-        .eq("id", state.playerId)
-        .eq("room_code", state.online.room.code);
+        .eq("id", state.playerId);
     } catch (err) {
       console.warn("Failed to delete self from room:", err);
     }
@@ -512,8 +511,6 @@ async function resetOnlineRoom() {
 
   stopLobbyPolling();
 
-  await deleteSelfFromRoom();
-
   state.online.role = null;
   state.online.room = null;
   state.online.ready = false;
@@ -532,6 +529,7 @@ async function createRoom() {
     return;
   }
 
+  await deleteSelfFromRoom();
   await resetOnlineRoom();
   const code = generateRoomCode();
   state.online.role = "host";
@@ -632,6 +630,10 @@ async function joinRoom() {
       setLobbyStatus(`Room ${phaseLabel}. Kamu hanya bisa join saat room masih lobby.`);
       startButton.disabled = false;
       return;
+    }
+
+    if (!isRejoining) {
+      await deleteSelfFromRoom();
     }
 
     const now = new Date();
